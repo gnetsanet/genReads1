@@ -28,16 +28,16 @@ import optparse
 from misc	import *
 
 
-    """////////////////////////////////////////////////////
-   /////////////    PARSE INPUT ARGUMENTS    /////////////
-  ////////////////////////////////////////////////////"""
+"""//////////////////////////////////////////////////
+////////////    PARSE INPUT ARGUMENTS    ////////////
+//////////////////////////////////////////////////"""
 
 
 DESC   = """%prog: Variant and read simulator for benchmarking NGS workflows."""
 VERS   = 0.1
 
 DEFAULT_COV = 10		# default average coverage value
-DEFAULT_RNG = 12345		# default RNG seed
+DEFAULT_RNG = None		# default RNG seed
 DEFAULT_RLN = 100		# default read-length
 DEFAULT_FLN = 250		# default mean fragment-length
 DEFAULT_FSD = 10		# default fragment-length std
@@ -139,7 +139,10 @@ else:
 GC_COVERAGE   = [n/100. for n in range(101)]
 RELATIVE_GC_COVERAGE_BIAS = [np.exp(-(((n-0.5)**2)/(2*(0.15**2)))) for n in GC_COVERAGE]
 
-RNG_SEED       = int(OPTS.RNG)
+if OPTS.RNG == None:
+	RNG_SEED   = random.randint(1,99999999)
+else:
+	RNG_SEED   = int(OPTS.RNG)
 AVG_COVERAGE   = float(OPTS.COV)
 AVG_VAR_FREQ   = float(OPTS.VRA)
 
@@ -149,9 +152,9 @@ else:
 	OUTFILE_NAME = OPTS.OUT
 
 
-    """////////////////////////////////////////////////////
-   /////////////    OTHER MISC PARAMETERS    /////////////
-  ////////////////////////////////////////////////////"""
+"""//////////////////////////////////////////////////
+////////////    OTHER MISC PARAMETERS    ////////////
+//////////////////////////////////////////////////"""
 
 # how much random leeway do we have with SNP_FREQ and INDEL_FREQ?
 #	e.g. if RNG_MULT = 0.1, during experiments the actual probability
@@ -164,9 +167,9 @@ COV_MULT   = .1
 DUMMY_QSCORE = 30
 
 
-    """/////////////////////////////////////////////
-   /////////////    MUTATION MODEL    /////////////
-  /////////////////////////////////////////////"""
+"""///////////////////////////////////////////
+////////////    MUTATION MODEL    ////////////
+///////////////////////////////////////////"""
 
 MUT_MODEL    = 'DEFAULT'
 
@@ -187,9 +190,9 @@ SNP_MUT    = [[0.,   0.15,  0.70,  0.15],
 		      [0.15, 0.70,  0.15,  0.  ]]
 
 
-    """/////////////////////////////////////////////////////
-   /////////////    SEQUENCING ERROR MODEL    /////////////
-  /////////////////////////////////////////////////////"""
+"""///////////////////////////////////////////////////
+////////////    SEQUENCING ERROR MODEL    ////////////
+///////////////////////////////////////////////////"""
 
 # how are the nucleotides misrepresented if a sub sequencing error occurs?
 SEQ_ERR    = [[0.,   0.4918, 0.3377, 0.1705 ],
@@ -204,16 +207,16 @@ SEQ_INS    = [0., 0., 0.]
 SEQ_DEL    = [0., 0., 0.]
 
 
-    """//////////////////////////////////////////////////
-   /////////////    QUALITY-SCORE MODEL    /////////////
-  //////////////////////////////////////////////////"""
+"""////////////////////////////////////////////////
+////////////    QUALITY-SCORE MODEL    ////////////
+////////////////////////////////////////////////"""
 
 QSCORE_MODEL = 'qScoreStuff.p'
 
 
-    """//////////////////////////////////////////////////
-   /////////////           MAIN()          /////////////
-  //////////////////////////////////////////////////"""
+"""////////////////////////////////////////////////
+////////////           MAIN()          ////////////
+////////////////////////////////////////////////"""
 
 def main():
 
@@ -291,9 +294,9 @@ def main():
 	cpFrag.insert(0,0.)
 
 
-	    """////////////////////////////////////////////////////////
-	   /////////////      INDEX REFERENCE FASTA      /////////////
-	  ////////////////////////////////////////////////////////"""
+	"""//////////////////////////////////////////////////////
+	////////////      INDEX REFERENCE FASTA      ////////////
+	//////////////////////////////////////////////////////"""
 
 	ref = []
 	REFFILE = open(REFERENCE,'r')
@@ -319,9 +322,9 @@ def main():
 	print '{:.3f} (sec)\n'.format(time.time()-tt)
 
 
-	    """////////////////////////////////////////////////////////////
-	   /////////////   ITERATE THROUGH EACH SEQ IN REF   /////////////
-	  ////////////////////////////////////////////////////////////"""
+	"""//////////////////////////////////////////////////////////
+	////////////   ITERATE THROUGH EACH SEQ IN REF   ////////////
+	//////////////////////////////////////////////////////////"""
 
 	# initialize output files
 	sys.stdout.write('initializing output files... ')
@@ -358,18 +361,20 @@ def main():
 	print '{:.3f} (sec)\n'.format(time.time()-tt)
 
 
-	bigReadNameOffset = 0
-	totalSNPs = 0
-	totalInds = 0
-	totalSTVs = 0
+	bigReadNameOffset    = 0
+	totalSNPs            = 0
+	totalInds            = 0
+	totalSTVs            = 0
+	sequencesSampledFrom = 0
+	totalBPSampledFrom   = 0
 	# for each sequence in reference fasta file...
 	for n_RI in ref_inds:
 		refName = n_RI[0]
 
 
-		    """////////////////////////////////////////////////////////
-		   /////////////     READ REFERENCE SEQUENCE     /////////////
-		  ////////////////////////////////////////////////////////"""
+		"""//////////////////////////////////////////////////////
+		////////////     READ REFERENCE SEQUENCE     ////////////
+		//////////////////////////////////////////////////////"""
 
 		# assumes fasta file is sane and has '\n' characters within long sequences
 		REFFILE.seek(n_RI[1])
@@ -393,9 +398,9 @@ def main():
 			exit(1)
 
 
-		    """//////////////////////////////////////////////////////////
-		   /////////////    PRE-COMPUTE INDEL LOCATIONS    /////////////
-		  //////////////////////////////////////////////////////////"""
+		"""////////////////////////////////////////////////////////
+		////////////    PRE-COMPUTE INDEL LOCATIONS    ////////////
+		////////////////////////////////////////////////////////"""
 
 		if NATURAL_INDELS or NATURAL_SNPS or NATURAL_SVS:
 			sys.stdout.write('introducing variants... ')
@@ -454,9 +459,9 @@ def main():
 			pass
 
 
-		    """////////////////////////////////////////////////////////////////////
-		   /////////////    TRANSLATE COMPLEX SVS INTO BIG INDELS    /////////////
-		  ////////////////////////////////////////////////////////////////////"""
+		"""//////////////////////////////////////////////////////////////////
+		////////////    TRANSLATE COMPLEX SVS INTO BIG INDELS    ////////////
+		//////////////////////////////////////////////////////////////////"""
 
 		# idT:
 		#
@@ -539,9 +544,9 @@ def main():
 				SVregions.append((Svv[2],Svv[2]+Svv[1]))
 
 
-		    """///////////////////////////////////////////////////////////////
-		   /////////////    INTRODUCE INSERTIONS & DELETIONS    /////////////
-		  ///////////////////////////////////////////////////////////////"""
+		"""/////////////////////////////////////////////////////////////
+		////////////    INTRODUCE INSERTIONS & DELETIONS    ////////////
+		/////////////////////////////////////////////////////////////"""
 
 		indelsToAttempt = sorted(indelsToAttempt)
 		for i in xrange(1,len(indelsToAttempt)):
@@ -651,17 +656,17 @@ def main():
 		del cumLens
 
 
-		    """////////////////////////////////////////////////////////
-		   /////////////    CONCAT INTO SINGLE STRING    /////////////
-		  ////////////////////////////////////////////////////////"""
+		"""//////////////////////////////////////////////////////
+		////////////    CONCAT INTO SINGLE STRING    ////////////
+		//////////////////////////////////////////////////////"""
 
 		myDat = bytearray(''.join(myDat))
 		myLen = len(myDat)
 
 
-		    """///////////////////////////////////////////////////
-		   /////////////       INTRODUCE SNPS       /////////////
-		  ///////////////////////////////////////////////////"""
+		"""/////////////////////////////////////////////////
+		////////////       INTRODUCE SNPS       ////////////
+		/////////////////////////////////////////////////"""
 
 		uppers = [ord(n) for n in NUM_NUCL]
 		lowers = [ord(n) for n in NUM_NUCL_LOWER]
@@ -687,9 +692,9 @@ def main():
 					#print prevBase,'->',newBase,myDat[spos]
 
 
-		    """///////////////////////////////////////////////////////
-		   /////////////    MORE MISCELLANEOUS STUFF    /////////////
-		  ///////////////////////////////////////////////////////"""
+		"""/////////////////////////////////////////////////////
+		////////////    MORE MISCELLANEOUS STUFF    ////////////
+		/////////////////////////////////////////////////////"""
 
 		# print number of variants introduced and how long it took to do so
 		if NATURAL_INDELS or NATURAL_SNPS or NATURAL_SVS:
@@ -716,9 +721,9 @@ def main():
 		print '{:.3f} (sec)\n'.format(time.time()-tt)
 
 
-		    """////////////////////////////////////////////////////
-		   /////////////   SOME READ PREPROCESSING   /////////////
-		  ////////////////////////////////////////////////////"""
+		"""//////////////////////////////////////////////////
+		////////////   SOME READ PREPROCESSING   ////////////
+		//////////////////////////////////////////////////"""
 
 		# replace Ns with random nucleotides if desired
 		if HANDLE_N == 'RANDOM':
@@ -742,6 +747,21 @@ def main():
 		indelCoverage = [0 for n in indelList]
 
 
+		# construct regions to sample from (from input bed file, if present)
+		if INPUT_BED != None:
+			bedRegions = []
+			bedfile = open(INPUT_BED,'r')
+			for line in bedfile:
+				splt = line.split('\t')
+				if splt[0] == refName:
+					origCoords  = ( max([int(splt[1])-MIN_SAMPLE_SIZE, 0]), min([int(splt[2])+MIN_SAMPLE_SIZE, originalLen-1]) )
+					myDatCoords = ( origCoords[0]-addThis[bisect.bisect(afterThis,origCoords[0])-1], origCoords[1]-addThis[bisect.bisect(afterThis,origCoords[1])-1] )
+					#print origCoords,'-->',myDatCoords
+					bedRegions.append(myDatCoords)
+			bedfile.close()
+			Niters = len(bedRegions)
+
+
 		# compute GC % of each window
 		gcp = []
 		if INPUT_BED == None:
@@ -758,26 +778,14 @@ def main():
 				(bi,bf) = bedRegions[i]
 				gcp.append(float(myDat[bi:bf].count('C')+myDat[bi:bf].count('G'))/(bf-bi))
 			targetCov = [RELATIVE_GC_COVERAGE_BIAS[int(100.*n)] for n in gcp]
-			alpha = (len(gcp)*AVG_COVERAGE)/sum(targetCov)
-			targetCov = [alpha*n for n in targetCov]
+			if len(targetCov) > 0 and sum(targetCov) > 0:
+				alpha = (len(gcp)*AVG_COVERAGE)/sum(targetCov)
+				targetCov = [alpha*n for n in targetCov]
 
 
 		# determine which windows contain Ns and enumerate their non-N regions
 		if INPUT_BED == None:
 			Niters = len(targetCov)
-		else:
-			bedRegions = []
-			bedfile = open(INPUT_BED,'r')
-			for line in bedfile:
-				splt = line.split('\t')
-				if splt[0] == refName:
-					origCoords  = ( max([int(splt[1])-MIN_SAMPLE_SIZE, 0]), min([int(splt[2])+MIN_SAMPLE_SIZE, originalLen-1]) )
-					myDatCoords = ( origCoords[0]-addThis[bisect.bisect(afterThis,origCoords[0])-1], origCoords[1]-addThis[bisect.bisect(afterThis,origCoords[1])-1] )
-					#print origCoords,'-->',myDatCoords
-					bedRegions.append(myDatCoords)
-			bedfile.close()
-			Niters = len(bedRegions)
-
 		hasN = {}
 		for i in xrange(Niters):
 
@@ -808,9 +816,9 @@ def main():
 					hasN[i] = NonNregions
 
 
-		    """////////////////////////////////////////////////////
-		   /////////////       READ SIMULATION       /////////////
-		  ////////////////////////////////////////////////////"""
+		"""//////////////////////////////////////////////////
+		////////////       READ SIMULATION       ////////////
+		//////////////////////////////////////////////////"""
 
 		print 'simulating reads...'
 		
@@ -1105,12 +1113,13 @@ def main():
 				nReads += 2
 
 		print nReads,'(reads)','{:.3f} (sec),'.format(time.time()-tt),int((nReads*READLEN)/(time.time()-tt)),'(bp/sec)'
-		print 'SSE rate:',float(nSeqSubErr)/(nReads*READLEN)
+		if nReads > 0:
+			print 'SSE rate:',float(nSeqSubErr)/(nReads*READLEN)
 
 
-		    """////////////////////////////////////////////////////
-		   /////////////      WRITE VCF OUTFILE      /////////////
-		  ////////////////////////////////////////////////////"""
+		"""//////////////////////////////////////////////////
+		////////////      WRITE VCF OUTFILE      ////////////
+		//////////////////////////////////////////////////"""
 
 		if SAVE_VCF:
 
@@ -1198,11 +1207,17 @@ def main():
 						OUTVCF.write(m+'\t')
 
 		# update read name offset for the next reference
-		bigReadNameOffset += jobOffsets[-1]
-		totalSNPs += nSNPs
-		totalInds += nIndels
-		totalSTVs += nSVs
-
+		if nReads > 0:
+			bigReadNameOffset    += jobOffsets[-1]
+			totalSNPs            += nSNPs
+			totalInds            += nIndels
+			totalSTVs            += nSVs
+			sequencesSampledFrom += 1
+			if INPUT_BED == None:
+				totalBPSampledFrom     += len(myDat)-myDat.count('N')
+			else:
+				for region in bedRegions:
+					totalBPSampledFrom += region[1]-region[0]+1
 
 	finalTime = time.time()-startTime
 
@@ -1216,9 +1231,9 @@ def main():
 		OUTVCF.close()
 
 
-	    """////////////////////////////////////////////////////
-	   /////////////    WRITE RUNINFO OUTFILE    /////////////
-	  ////////////////////////////////////////////////////"""
+	"""//////////////////////////////////////////////////
+	////////////    WRITE RUNINFO OUTFILE    ////////////
+	//////////////////////////////////////////////////"""
 
 	if SAVE_RUNINFO:
 		rfOut = open(OUTFILE_NAME+'_runInfo.txt','w')
@@ -1228,7 +1243,10 @@ def main():
 		fq2SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read2.fq'))/1000/1000/1000
 
 		rfOut.write('Reference:\t\t'+REFERENCE+' ({:.2f} MB)\n'.format(refSizeMB))
-		rfOut.write('# Sequences:\t'+str(len(ref_inds))+'\n')
+		if INPUT_BED == None:
+			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+printBasesNicely(totalBPSampledFrom)+' in total)\n')
+		else:
+			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+str(sequencesSampledFrom)+' sampled from, '+printBasesNicely(totalBPSampledFrom)+' in total)\n')
 		rfOut.write('RunDate:\t\t'+startDate+'\n')
 		rfOut.write('Command:\t\t'+' '.join(sys.argv)+'\n')
 
@@ -1243,7 +1261,6 @@ def main():
 		if SAVE_VCF:
 			vcfSizeMB = float(os.path.getsize(OUTFILE_NAME+'_golden.vcf'))/1000/1000
 			rfOut.write('\nGolden VCF:\t\t'+OUTFILE_NAME+'_golden.vcf ({:.2f} MB)\n'.format(vcfSizeMB))
-		rfOut.write('\nTotal Runtime:\t'+str(int(finalTime))+' (sec)\n')
 
 		rfOut.write('\n\n********* PARAMETERS *********\n\n')
 		rfOut.write('ReadLen:\t\t'+str(READLEN)+'\n')
@@ -1252,9 +1269,6 @@ def main():
 		rfOut.write('Avg Coverage:\t'+str(AVG_COVERAGE)+'x\n')
 		rfOut.write('N Handling:\t\t'+HANDLE_N+'\n')
 		rfOut.write('Variant Freq:\t'+str(AVG_VAR_FREQ)+'\n')
-		rfOut.write('\t- '+str(totalSNPs)+' SNPs\n')
-		rfOut.write('\t- '+str(totalInds)+' small indels (length 1-'+str(MAX_INDEL)+')\n')
-		rfOut.write('\t- '+str(totalSTVs)+' SVs\n')
 
 		if SEQUENCING_SNPS:
 			rfOut.write('SSE rate:\t\t'+str(AVG_SSE)+'\n')
@@ -1275,6 +1289,15 @@ def main():
 		else:
 			rfOut.write('Windowing:\t\t'+INPUT_BED+'\n')
 		rfOut.write('RNG_SEED:\t\t'+str(RNG_SEED)+'\n')
+
+		rfOut.write('\n\n********* STATS *********\n\n')
+		rfOut.write('Total Reads:\t'+str(bigReadNameOffset)+' ('+printBasesNicely(bigReadNameOffset*READLEN)+')\n')
+		rfOut.write('Total Runtime:\t'+str(int(finalTime))+' sec\n')
+		rfOut.write('Rate:\t\t\t'+printBasesNicely(int(float(bigReadNameOffset*READLEN)/finalTime+0.5))+'/sec\n\n')
+		rfOut.write('Variants Introduced:\n')
+		rfOut.write('\t- '+str(totalSNPs)+' SNPs\n')
+		rfOut.write('\t- '+str(totalInds)+' small indels (length 1-'+str(MAX_INDEL)+')\n')
+		rfOut.write('\t- '+str(totalSTVs)+' SVs\n')
 
 		rfOut.close()
 

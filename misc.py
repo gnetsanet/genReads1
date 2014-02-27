@@ -87,3 +87,18 @@ def histoxy(data,bins=10,myMin=None,myMax=None):
 			y[ind] += 1
 			y[ind+1] += 1
 	return x, y
+
+def printBasesNicely(bp):
+	if bp < 1000:
+		return str(bp)+' bp'
+	elif bp < 1000000:
+		return '{:.2f} kbp'.format(float(bp)/1000.)
+	elif bp < 1000000000:
+		return '{:.2f} Mbp'.format(float(bp)/1000000.)
+	elif bp < 1000000000000:
+		return '{:.2f} Gbp'.format(float(bp)/1000000000.)
+	elif bp < 1000000000000000:
+		return '{:.2f} Tbp'.format(float(bp)/1000000000000.)
+	elif bp < 1000000000000000000:
+		return '{:.2f} Pbp'.format(float(bp)/1000000000000000.)
+	return str(bp)+' bp'
