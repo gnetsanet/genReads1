@@ -321,7 +321,7 @@ def main():
 
 			prevP = REFFILE.tell()
 			prevR = data[1:-1]
-	print '{:.3f} (sec)\n'.format(time.time()-tt)
+	print '{0:.3f} (sec)\n'.format(time.time()-tt)
 
 
 	"""//////////////////////////////////////////////////////////
@@ -360,7 +360,7 @@ def main():
 		OUTVCF.write('##ALT=<ID=TRANS,Description="Translocation">\n')
 		OUTVCF.write('##ALT=<ID=INV-TRANS,Description="Inverted translocation">\n')
 		OUTVCF.write('#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n')
-	print '{:.3f} (sec)\n'.format(time.time()-tt)
+	print '{0:.3f} (sec)\n'.format(time.time()-tt)
 
 
 	bigReadNameOffset    = 0
@@ -386,8 +386,11 @@ def main():
 		myDat  = REFFILE.read(n_RI[2]-n_RI[1]).split('\n')
 		myLens = [len(m) for m in myDat]
 		myLen  = sum(myLens)
-		print '{:.3f} (sec)'.format(time.time()-tt)
-		print '{:,} bp\n'.format(myLen)
+		print '{0:.3f} (sec)'.format(time.time()-tt)
+		if sys.version_info >= (2,7):
+			print '{:,} bp\n'.format(myLen)
+		else:
+			print '{0:} bp\n'.format(myLen)
 		inWidth = len(myDat[0])
 		if len(myDat[-1]) == 0:	# if last line is empty, remove it.
 			del myDat[-1]
@@ -749,7 +752,7 @@ def main():
 
 		# print number of variants introduced and how long it took to do so
 		if NATURAL_INDELS or NATURAL_SNPS or NATURAL_SVS:
-			print '{:.3f} (sec)'.format(time.time()-indelStart)
+			print '{0:.3f} (sec)'.format(time.time()-indelStart)
 			print nSNPs, 'SNPs'
 			print nIndels, 'indels'
 			print nSVs, 'SVs'
@@ -769,7 +772,7 @@ def main():
 		sys.stdout.flush()
 		tt = time.time()
 		myDat = myDat.upper()
-		print '{:.3f} (sec)\n'.format(time.time()-tt)
+		print '{0:.3f} (sec)\n'.format(time.time()-tt)
 
 
 		"""//////////////////////////////////////////////////
@@ -787,7 +790,7 @@ def main():
 					for j in xrange(i,min([i+COV_WINDOW,myLen])):
 						if myDat[j] == ASCII_N or myDat[j] == ASCII_n:
 							myDat[j] = NUM_NUCL[int(random.random()*4)]
-			print '{:.3f} (sec)\n'.format(time.time()-tt)
+			print '{0:.3f} (sec)\n'.format(time.time()-tt)
 
 
 		# init variant coverage dictionaries
@@ -796,7 +799,7 @@ def main():
 		for k in snpKeys:
 			snpCoverage[k] = 0
 		indelCoverage = [0 for n in indelList]
-		print indelList
+		#print indelList
 
 
 		# construct regions to sample from (from input bed file, if present)
@@ -1164,7 +1167,7 @@ def main():
 
 				nReads += 2
 
-		print nReads,'(reads)','{:.3f} (sec),'.format(time.time()-tt),int((nReads*READLEN)/(time.time()-tt)),'(bp/sec)'
+		print nReads,'(reads)','{0:.3f} (sec),'.format(time.time()-tt),int((nReads*READLEN)/(time.time()-tt)),'(bp/sec)'
 		if nReads > 0:
 			print 'SSE rate:',float(nSeqSubErr)/(nReads*READLEN)
 
@@ -1298,7 +1301,7 @@ def main():
 		fq1SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read1.fq'))/1000/1000/1000
 		fq2SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read2.fq'))/1000/1000/1000
 
-		rfOut.write('Reference:\t\t'+REFERENCE+' ({:.2f} MB)\n'.format(refSizeMB))
+		rfOut.write('Reference:\t\t'+REFERENCE+' ({0:.2f} MB)\n'.format(refSizeMB))
 		if INPUT_BED == None:
 			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+printBasesNicely(totalBPSampledFrom)+' in total)\n')
 		else:
@@ -1307,16 +1310,16 @@ def main():
 		rfOut.write('Command:\t\t'+' '.join(sys.argv)+'\n')
 
 		rfOut.write('\n\n********* FILES GENERATED *********\n\n')
-		rfOut.write('Read files:\t\t'+OUTFILE_NAME+'_read1.fq ({:.2f} GB)\n\t\t\t\t'.format(fq1SizeGB)+OUTFILE_NAME+'_read2.fq ({:.2f} GB)\n'.format(fq2SizeGB))
+		rfOut.write('Read files:\t\t'+OUTFILE_NAME+'_read1.fq ({0:.2f} GB)\n\t\t\t\t'.format(fq1SizeGB)+OUTFILE_NAME+'_read2.fq ({:.2f} GB)\n'.format(fq2SizeGB))
 		if SAVE_CORRECT_REF:
 			crSizeMB = float(os.path.getsize(OUTFILE_NAME+'_correctRef.fa'))/1000/1000
-			rfOut.write('\nRef + Variants:\t'+OUTFILE_NAME+'_correctRef.fa ({:.2f} MB)\n'.format(crSizeMB))
+			rfOut.write('\nRef + Variants:\t'+OUTFILE_NAME+'_correctRef.fa ({0:.2f} MB)\n'.format(crSizeMB))
 		if SAVE_SAM:
 			samSizeGB = float(os.path.getsize(OUTFILE_NAME+'_golden.sam'))/1000/1000/1000
-			rfOut.write('\nGolden SAM:\t\t'+OUTFILE_NAME+'_golden.sam ({:.2f} GB)\n'.format(samSizeGB))
+			rfOut.write('\nGolden SAM:\t\t'+OUTFILE_NAME+'_golden.sam ({0:.2f} GB)\n'.format(samSizeGB))
 		if SAVE_VCF:
 			vcfSizeMB = float(os.path.getsize(OUTFILE_NAME+'_golden.vcf'))/1000/1000
-			rfOut.write('\nGolden VCF:\t\t'+OUTFILE_NAME+'_golden.vcf ({:.2f} MB)\n'.format(vcfSizeMB))
+			rfOut.write('\nGolden VCF:\t\t'+OUTFILE_NAME+'_golden.vcf ({0:.2f} MB)\n'.format(vcfSizeMB))
 
 		rfOut.write('\n\n********* PARAMETERS *********\n\n')
 		rfOut.write('ReadLen:\t\t'+str(READLEN)+'\n')
