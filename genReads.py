@@ -59,7 +59,8 @@ PARSER.add_option('-o',    help='Output filename prefix [%default]',            
 PARSER.add_option('-r',    help='Reference fasta',                                    dest='REF',                          action='store',      metavar='<ARG>')
 PARSER.add_option('-R',    help='RNG seed value [%default]',                          dest='RNG',     default=DEFAULT_RNG, action='store',      metavar='<ARG>')
 PARSER.add_option('-s',    help='Average sequencing error rate [%default]',           dest='SER',     default=DEFAULT_SER, action='store',      metavar='<ARG>')
-PARSER.add_option('-v',    help='Average variant occurence rate [%default]',          dest='VRA',     default=DEFAULT_VRA, action='store',      metavar='<ARG>')
+PARSER.add_option('-v',    help='Input VCF file',                                     dest='VCF',     default=None,        action='store',      metavar='<ARG>')
+PARSER.add_option('-V',    help='Average variant occurence rate [%default]',          dest='VRA',     default=DEFAULT_VRA, action='store',      metavar='<ARG>')
 PARSER.add_option('-w',    help='Window size for computing GC% [%default]',           dest='WIN',     default=DEFAULT_WIN, action='store',      metavar='<ARG>')
 PARSER.add_option('--FA',  help='Output modified reference as fasta file [%default]', dest='BOOL_FA', default=False,       action='store_true')
 PARSER.add_option('--SAM', help='Output correct alignment as SAM file [%default]',    dest='BOOL_SA', default=False,       action='store_true')
@@ -82,6 +83,7 @@ else:
 	REFERENCE = OPTS.REF
 
 INPUT_BED        = OPTS.BED
+INPUT_VCF        = OPTS.VCF
 
 PAIRED_END       = OPTS.BOOL_PE
 SAVE_SAM         = OPTS.BOOL_SA
@@ -424,6 +426,7 @@ def main():
 
 		# introduce simulated indels
 		indelsToAttempt = []
+		nIndels = 0
 		if NATURAL_INDELS:
 			rIF = ((random.random()-.5)*(2*RNG_MULT) + 1.)*INDEL_FREQ*var_mult
 			nIndels = int(rIF*myLen+.5)
@@ -443,6 +446,7 @@ def main():
 					#  ...p2-1, p2, [], p2+idlen+1, p2+idlen+2, ...
 				indelsToAttempt.append((p1,p2,idlen,idT))
 
+
 		SVsToAttempt = []
 		# introduce simulated structural variants
 		if NATURAL_SVS:
@@ -457,6 +461,41 @@ def main():
 			SVsToAttempt.append(([130000,50],'BD'))
 			"""
 			pass
+
+
+		# introduce variants from provided input VCF file
+		input_snps = []
+		input_inds = {}
+		if INPUT_VCF != None:
+			invcf = open(INPUT_VCF,'r')
+			for line in invcf:
+				if line[0] != '#':
+					splt = line.split('\t')
+					if splt[0] == refName:
+						pos = int(splt[1])
+						rnt = splt[3]
+						ant = splt[4]
+						# structural variants aren't supported yet, sorry!
+						if (splt[2] != '.') or ('[' in ant) or (']' in ant) or (':' in ant) or ('SVTYPE' in splt[7]):
+							print "skipping variant:",line
+							continue
+						# snps
+						if len(rnt) == len(ant):
+							for i in xrange(len(rnt)):
+								input_snps.append((pos+i,rnt[i],ant[i]))
+						# insertion
+						elif len(rnt) == 1 and len(ant) > 1:
+							SVsToAttempt.append(([pos,ant[1:]],'BI'))
+							input_inds[(pos,rnt,ant)] = 1
+						# deletion
+						elif len(rnt) > 1 and len(ant) == 1:
+							SVsToAttempt.append(([pos,len(rnt)-1],'BD'))
+							input_inds[(pos,rnt,ant)] = 1
+						# otherwise I have no idea, and don't feel like figuring it out now.
+						else:
+							print "skipping variant:",line
+							continue
+			invcf.close()
 
 
 		"""//////////////////////////////////////////////////////////////////
@@ -691,6 +730,18 @@ def main():
 					myDat[spos] = newBase
 					#print prevBase,'->',newBase,myDat[spos]
 
+		for n in input_snps:
+			spos = n[0]-1
+			spos -= addThis[bisect.bisect(afterThis,spos)-1]
+			#print n, spos, chr(myDat[spos])
+			if chr(myDat[spos]).upper() == n[1]:
+				snps[spos] = (myDat[spos],n[2],spos)
+				myDat[spos] = n[2]
+				nSNPs += 1
+			else:
+				# the snp we're trying to insert was affected by a random variant
+				pass
+
 
 		"""/////////////////////////////////////////////////////
 		////////////    MORE MISCELLANEOUS STUFF    ////////////
@@ -745,6 +796,7 @@ def main():
 		for k in snpKeys:
 			snpCoverage[k] = 0
 		indelCoverage = [0 for n in indelList]
+		print indelList
 
 
 		# construct regions to sample from (from input bed file, if present)
@@ -1155,9 +1207,13 @@ def main():
 							#print 'BigInsert', Svv
 							newStr = str(myDat[myInd:myInd+len(Svv[1])+1])
 							outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','SVTYPE=INS;END='+str(Svv[0])+';SVLEN='+str(len(Svv[1])))
+							if (int(outDat[1]),outDat[3],outDat[4]) in input_inds:
+								outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i]))
 						elif idT == 'BD':
 							#print 'BigDeletion', Svv
 							outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','SVTYPE=DEL;END='+str(Svv[0]+Svv[1])+';SVLEN='+str(-Svv[1]))
+							if (int(outDat[1]),outDat[3],outDat[4]) in input_inds:
+								outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i]))
 						elif idT == 'R':
 							#print 'Repeat', Svv
 							newStr = str(myDat[myInd:myInd+len(Svv[1])*Svv[2]+1])
