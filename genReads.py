@@ -482,6 +482,10 @@ def main():
 						if (splt[2] != '.') or ('[' in ant) or (']' in ant) or (':' in ant) or ('SVTYPE' in splt[7]):
 							print "skipping variant:",line
 							continue
+						# ignore variants with alternate alleles for now..
+						if (',' in rnt) or (',' in ant):
+							print "skipping variant:",line
+							continue
 						# snps
 						if len(rnt) == len(ant):
 							for i in xrange(len(rnt)):
@@ -499,6 +503,7 @@ def main():
 							print "skipping variant:",line
 							continue
 			invcf.close()
+		nIndels += len(input_inds)
 
 
 		"""//////////////////////////////////////////////////////////////////
@@ -517,7 +522,7 @@ def main():
 		#	'IT' : inverted translocation
 
 		SVregions = []	# disallow small "normal" indels from happening within regions affected by SVs
-		nSVs = 0
+		nSVs = -len(input_inds)
 		for i in xrange(len(SVsToAttempt)):
 			n = SVsToAttempt[i]
 
