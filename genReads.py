@@ -22,9 +22,13 @@ import time
 import bisect
 import cPickle as pickle
 import numpy as np
-#import matplotlib.pyplot as mpl
+import matplotlib.pyplot as mpl
 import optparse
 
+# absolute path to this script
+SIM_PATH         = '/'.join(os.path.realpath(__file__).split('/')[:-1])+'/'
+
+sys.path.append(SIM_PATH)
 from misc	import *
 
 
@@ -36,52 +40,54 @@ from misc	import *
 DESC   = """%prog: Variant and read simulator for benchmarking NGS workflows."""
 VERS   = 0.1
 
-DEFAULT_COV = 10		# default average coverage value
-DEFAULT_RNG = None		# default RNG seed
-DEFAULT_RLN = 100		# default read-length
-DEFAULT_FLN = 250		# default mean fragment-length
-DEFAULT_FSD = 10		# default fragment-length std
-DEFAULT_WIN = 1000		# default sliding window size (for sampling reads / computing GC%)
-DEFAULT_NHL = 'OMIT'	# default N-handling
-DEFAULT_SER = 0.01		# default average sequencing error rate
-DEFAULT_VRA = 0.00034	# default average rate of variant occurences
+DEFAULT_COV = 10.				# default average coverage value
+DEFAULT_RNG = None				# default RNG seed
+DEFAULT_RLN = 100				# default read-length
+DEFAULT_FLN = 250				# default mean fragment-length
+DEFAULT_FSD = 10				# default fragment-length std
+DEFAULT_WIN = 1000				# default sliding window size (for sampling reads / computing GC%)
+DEFAULT_NHL = 'OMIT'			# default N-handling
+DEFAULT_SER = 0.01				# default average sequencing error rate
+DEFAULT_VRA = 0.00034			# default average rate of variant occurences
+DEFAULT_QSM = 'qScoreStuff.p'	# default quality-score model
 
-PARSER = optparse.OptionParser(description=DESC,version="Zach's Super Duper Read Simulator v"+str(VERS))
+PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -o <out.prefix>',description=DESC,version="%prog v"+str(VERS))
 
 PARSER.add_option('-p',    help='Generate paired-end reads [%default]',               dest='BOOL_PE', default=False,       action='store_true')
-PARSER.add_option('-b',    help='Input bed file containing regions to sample from',   dest='BED',     default=None,        action='store',      metavar='<ARG>')
-PARSER.add_option('-c',    help='Average coverage [%default]',                        dest='COV',     default=DEFAULT_COV, action='store',      metavar='<ARG>')
-PARSER.add_option('-f',    help='Average fragment length [%default]',                 dest='FLEN',    default=DEFAULT_FLN, action='store',      metavar='<ARG>')
-PARSER.add_option('-F',    help='Fragment length std [%default]',                     dest='FSTD',    default=DEFAULT_FSD, action='store',      metavar='<ARG>')
-PARSER.add_option('-l',    help='Read length [%default]',                             dest='RLEN',    default=DEFAULT_RLN, action='store',      metavar='<ARG>')
-PARSER.add_option('-N',    help="'N' handling: RANDOM or OMIT. [%default]",           dest='NHAN',    default=DEFAULT_NHL, action='store',      metavar='<ARG>')
-PARSER.add_option('-o',    help='Output filename prefix [%default]',                  dest='OUT',     default='myData',    action='store',      metavar='<ARG>')
-PARSER.add_option('-r',    help='Reference fasta',                                    dest='REF',                          action='store',      metavar='<ARG>')
-PARSER.add_option('-R',    help='RNG seed value [%default]',                          dest='RNG',     default=DEFAULT_RNG, action='store',      metavar='<ARG>')
-PARSER.add_option('-s',    help='Average sequencing error rate [%default]',           dest='SER',     default=DEFAULT_SER, action='store',      metavar='<ARG>')
-PARSER.add_option('-v',    help='Input VCF file',                                     dest='VCF',     default=None,        action='store',      metavar='<ARG>')
-PARSER.add_option('-V',    help='Average variant occurence rate [%default]',          dest='VRA',     default=DEFAULT_VRA, action='store',      metavar='<ARG>')
-PARSER.add_option('-w',    help='Window size for computing GC% [%default]',           dest='WIN',     default=DEFAULT_WIN, action='store',      metavar='<ARG>')
+PARSER.add_option('-b',    help='Input bed file containing regions to sample from',   dest='BED',     default=None,        action='store',      metavar='<targets.bed>')
+PARSER.add_option('-c',    help='Average coverage [%default]',                        dest='COV',     default=DEFAULT_COV, action='store',      metavar='<float>')
+PARSER.add_option('-f',    help='Average fragment length [%default]',                 dest='FLEN',    default=DEFAULT_FLN, action='store',      metavar='<int>')
+PARSER.add_option('-F',    help='Fragment length std [%default]',                     dest='FSTD',    default=DEFAULT_FSD, action='store',      metavar='<int>')
+PARSER.add_option('-l',    help='Read length [%default]',                             dest='RLEN',    default=DEFAULT_RLN, action='store',      metavar='<int>')
+PARSER.add_option('-N',    help="'N' handling: RANDOM or OMIT. [%default]",           dest='NHAN',    default=DEFAULT_NHL, action='store',      metavar='<str>')
+PARSER.add_option('-o',    help='Output filename prefix',                             dest='OUT',                          action='store',      metavar='<out.prefix>')
+PARSER.add_option('-q',    help='Quality score model [%default]',                     dest='QSM',     default=DEFAULT_QSM, action='store',      metavar='<model.p>')
+PARSER.add_option('-r',    help='Reference fasta',                                    dest='REF',                          action='store',      metavar='<ref.fa>')
+PARSER.add_option('-R',    help='RNG seed value [%default]',                          dest='RNG',     default=DEFAULT_RNG, action='store',      metavar='<int>')
+PARSER.add_option('-s',    help='Average sequencing error rate [%default]',           dest='SER',     default=DEFAULT_SER, action='store',      metavar='<float>')
+PARSER.add_option('-v',    help='Input VCF file',                                     dest='VCF',     default=None,        action='store',      metavar='<str>')
+PARSER.add_option('-V',    help='Average variant occurence rate [%default]',          dest='VRA',     default=DEFAULT_VRA, action='store',      metavar='<float>')
+PARSER.add_option('-w',    help='Window size for computing GC% [%default]',           dest='WIN',     default=DEFAULT_WIN, action='store',      metavar='<int>')
 PARSER.add_option('--FA',  help='Output modified reference as fasta file [%default]', dest='BOOL_FA', default=False,       action='store_true')
 PARSER.add_option('--SAM', help='Output correct alignment as SAM file [%default]',    dest='BOOL_SA', default=False,       action='store_true')
 PARSER.add_option('--VCF', help='Output introduced variants as VCF file [%default]',  dest='BOOL_VC', default=False,       action='store_true')
 PARSER.add_option('--TXT', help='Output simulation info as .txt file [%default]',     dest='BOOL_RI', default=False,       action='store_true')
-PARSER.add_option('--job', help='Job IDs for generating reads in parallel',           dest='MULTI',                        action='store',      metavar='<ARG1> <ARG2>', nargs=2)
+PARSER.add_option('--job', help='Job IDs for generating reads in parallel',           dest='MULTI',                        action='store',      metavar='<int> <int>', nargs=2)
 
 PARSER.add_option('--no-snp',     help="Don't introduce SNPs [%default]",                           dest='NO_SNP', default=False, action='store_true')
 PARSER.add_option('--no-ind',     help="Don't introduce small indels [%default]",                   dest='NO_IND', default=False, action='store_true')
 PARSER.add_option('--no-svs',     help="Don't introduce large structural variants [%default]",      dest='NO_SVS', default=False, action='store_true')
 PARSER.add_option('--no-qscores', help="Don't compute quality scores (use dummy value) [%default]", dest='NO_QSC', default=False, action='store_true')
+PARSER.add_option('--no-gcbias',  help="Don't account for GC% bias [%default]",                     dest='NO_GCB', default=False, action='store_true')
 
 (OPTS,ARGS) = PARSER.parse_args()
 #print OPTS
 
-if OPTS.REF == None:
-	print 'Error: No reference provided.'
+if len(sys.argv) <= 1:
+	PARSER.print_help()
 	exit(1)
-else:
-	REFERENCE = OPTS.REF
 
+REFERENCE        = OPTS.REF
 INPUT_BED        = OPTS.BED
 INPUT_VCF        = OPTS.VCF
 
@@ -96,6 +102,7 @@ NATURAL_SNPS       = not(OPTS.NO_SNP)
 NATURAL_INDELS     = not(OPTS.NO_IND)
 NATURAL_SVS        = not(OPTS.NO_SVS)
 SEQUENCING_QSCORES = not(OPTS.NO_QSC)
+GC_BIAS            = not(OPTS.NO_GCB)
 
 if OPTS.MULTI == None:
 	MULTI_JOB  = False
@@ -124,22 +131,19 @@ else:
 
 # consider fragment sizes within +- 3 stds
 MIN_SAMPLE_SIZE = FRAGMENT_SIZE+3*FRAGMENT_STD
-FRAGLEN         = range(FRAGMENT_SIZE-3*FRAGMENT_STD,FRAGMENT_SIZE+3*FRAGMENT_STD+1)
-FRAGPROB        = [np.exp(-(((n-float(FRAGMENT_SIZE))**2)/(2*(FRAGMENT_STD**2)))) for n in FRAGLEN]
 
-if PAIRED_END:
-	if 2*READLEN >= FRAGMENT_SIZE-3*FRAGMENT_STD:
-		print 'Error: Fragment length must be at least 2*READLEN + 3*FRAGMENT_STD'
-		exit(1)
-	if COV_WINDOW <= FRAGMENT_SIZE+3*FRAGMENT_STD:
-		print 'Error: Window size must be at least FRAGMENT_LEN + 3*FRAGMENT_STD'
-		exit(1)
+if FRAGMENT_STD == 0:
+	FRAGLEN         = [FRAGMENT_SIZE]
+	FRAGPROB        = [1.]
 else:
-	print 'Error: Single-End reads not supported yet, sorry :('
-	exit(1)
+	FRAGLEN         = range(FRAGMENT_SIZE-3*FRAGMENT_STD,FRAGMENT_SIZE+3*FRAGMENT_STD+1)
+	FRAGPROB        = [np.exp(-(((n-float(FRAGMENT_SIZE))**2)/(2*(FRAGMENT_STD**2)))) for n in FRAGLEN]
 
 GC_COVERAGE   = [n/100. for n in range(101)]
-RELATIVE_GC_COVERAGE_BIAS = [np.exp(-(((n-0.5)**2)/(2*(0.15**2)))) for n in GC_COVERAGE]
+if GC_BIAS:
+	RELATIVE_GC_COVERAGE_BIAS = [np.exp(-(((n-0.5)**2)/(2*(0.15**2)))) for n in GC_COVERAGE]
+else:
+	RELATIVE_GC_COVERAGE_BIAS = [1. for n in GC_COVERAGE]
 
 if OPTS.RNG == None:
 	RNG_SEED   = random.randint(1,99999999)
@@ -213,7 +217,64 @@ SEQ_DEL    = [0., 0., 0.]
 ////////////    QUALITY-SCORE MODEL    ////////////
 ////////////////////////////////////////////////"""
 
-QSCORE_MODEL = 'qScoreStuff.p'
+if OPTS.QSM == DEFAULT_QSM:
+	QSCORE_MODEL = SIM_PATH+DEFAULT_QSM
+else:
+	QSCORE_MODEL = OPTS.QSM
+
+
+"""////////////////////////////////////////////////
+////////////      SANITY-CHECKING      ////////////
+////////////////////////////////////////////////"""
+
+if OPTS.REF == None:
+	print 'Error: No reference provided.'
+	exit(1)
+
+if OPTS.OUT == None:
+	print 'Error: No outfile prefix provided.'
+	exit(1)
+
+if AVG_COVERAGE <= 0.:
+	print 'Error: Average coverage must be greater than 0.'
+	exit(1)
+if AVG_VAR_FREQ < 0.:
+	print 'Error: Average variant frequency must be non-negative.'
+	exit(1)
+if AVG_SSE < 0.:
+	print 'Error: Average SSE rate must be non-negative.'
+	exit(1)
+if READLEN <= 0:
+	print 'Error: Read length must be greater than 0.'
+	exit(1)
+if FRAGMENT_SIZE <= 0:
+	print 'Error: Mean fragment length must be greater than 0.'
+	exit(1)
+if FRAGMENT_STD < 0:
+	print 'Error: Fragment length standard deviation must be non-negative'
+	exit(1)
+if COV_WINDOW <= 0:
+	print 'Error: Sliding sampling window must be greater than 0.'
+	exit(1)
+
+if PAIRED_END:
+	if 2*READLEN >= FRAGMENT_SIZE-3*FRAGMENT_STD:
+		print 'Error: Fragment length must be at least 2*READLEN + 3*FRAGMENT_STD'
+		exit(1)
+	if COV_WINDOW <= FRAGMENT_SIZE+3*FRAGMENT_STD:
+		print 'Error: Window size must be at least FRAGMENT_LEN + 3*FRAGMENT_STD'
+		exit(1)
+else:
+	print 'Error: Single-End reads not supported yet, sorry :('
+	exit(1)
+
+if not os.path.isfile(REFERENCE):
+	print 'Error: Could not open reference file.'
+	exit(1)
+
+if not os.path.isfile(QSCORE_MODEL):
+	print 'Error: Could not open quality-score model.'
+	exit(1)
 
 
 """////////////////////////////////////////////////
@@ -252,40 +313,95 @@ def main():
 	if SEQUENCING_QSCORES:
 		learnedCycles = len(allPMFs)
 		nQscores = len(allPMFs[0])
-		initQProb = np.cumsum(allPMFs[0]).tolist()[:-1]
-		initQProb.insert(0,0.)
-		allQscoreCumProb = [0 for n in xrange(learnedCycles*nQscores)]
-		#allCgs = []
-		for i in xrange(learnedCycles):		# for each cycle 'i'...
-			for j in xrange(nQscores):		# for each previous qscore 'j'...
-				prod = [allPMFs[i][k]*probQ[j][k] for k in xrange(nQscores)]
-				sprd = sum(prod)
-				prod = [n/sprd for n in prod]
-				#allCgs.append(sum([n*prod[n] for n in xrange(nQscores)])/sum(prod))
-				cumProb = np.cumsum(prod).tolist()[:-1]
-				cumProb.insert(0,0.)
-				allQscoreCumProb[i*nQscores+j] = cumProb
 
-		# precompute P(error) for each quality score
-		pError = {}
-		for i in xrange(nQscores):
-			ind = bytearray([i+qOffset])[0]
-			pError[ind] = 10.**(-i/10.)
-		# scale error rates such that the average SSE rate is as desired
-		# this is done by sampling a number of reads and estimating the current average rate
-		sseScaleSample = 20000
-		avgError = []
-		for i in xrange(sseScaleSample):
-			q1 = bytearray()
-			q1.append(randEvent(initQProb)+qOffset)
-			for j in xrange(1,READLEN):
-				q1.append(randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset)
-			#print [n-qOffset for n in q1]
-			avgError.append(sum([pError[n] for n in q1])/READLEN)
-		sseScalar = AVG_SSE/(sum(avgError)/len(avgError))
-		for k in sorted(pError.keys()):
-			pError[k] = sseScalar*pError[k]
-			#print k, pError[k]
+		print '\nDesired P(error):\t\t','{0:.6f}'.format(AVG_SSE),'( phred:',int(-10.*np.log10(AVG_SSE)),')'
+		qScoreShift = 0
+		prevShift   = 0
+		printFirst  = 1
+		while True:
+			initQpmf = copy.deepcopy(allPMFs[0])
+			#print initQpmf
+			if qScoreShift > 0:
+				for k in xrange(qScoreShift):
+					del initQpmf[-1]
+					initQpmf.insert(0,0.)
+			elif qScoreShift < 0:
+				for k in xrange(-qScoreShift):
+					del initQpmf[0]
+					initQpmf.append(0.)
+			#print initQpmf
+			siqp = sum(initQpmf)
+			initQpmf = [n/siqp for n in initQpmf]
+
+			initQProb = np.cumsum(initQpmf).tolist()[:-1]
+			initQProb.insert(0,0.)
+			allQscoreCumProb = [0 for n in xrange(learnedCycles*nQscores)]
+
+			for i in xrange(learnedCycles):		# for each cycle 'i'...
+				for j in xrange(nQscores):		# for each previous qscore 'j'...
+					prod = [allPMFs[i][k]*probQ[j][k] for k in xrange(nQscores)]
+					if qScoreShift > 0:
+						for k in xrange(qScoreShift):
+							del prod[-1]
+							prod.insert(0,0.)
+					elif qScoreShift < 0:
+						for k in xrange(-qScoreShift):
+							del prod[0]
+							prod.append(0.)
+					sprd = sum(prod)
+					prod = [n/sprd for n in prod]
+					cumProb = np.cumsum(prod).tolist()[:-1]
+					cumProb.insert(0,0.)
+					allQscoreCumProb[i*nQscores+j] = cumProb
+
+			pError = {}
+			for i in xrange(nQscores):
+				ind = bytearray([i+qOffset])[0]
+				pError[ind] = 10.**(-i/10.)
+			# scale error rates such that the average SSE rate is as desired
+			# this is done by sampling a number of reads and estimating the current average rate
+			sseScaleSample = 10000
+			avgError = []
+			for i in xrange(sseScaleSample):
+				q1 = bytearray()
+				q1.append(randEvent(initQProb)+qOffset)
+				for j in xrange(1,READLEN):
+					q1.append(randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset)
+				#print [n-qOffset for n in q1]
+				avgError.append(sum([pError[n] for n in q1])/READLEN)
+			modelError  = (sum(avgError)/len(avgError))
+			qScoreShift += int(-10.*np.log10(AVG_SSE)) - int(-10.*np.log10(modelError))
+			sseScalar = AVG_SSE/modelError
+			if printFirst:
+				printFirst = 0
+				print 'Avg P(error) of Input Model:\t','{0:.6f}'.format(modelError),'( phred:',int(-10.*np.log10(modelError)),')'
+
+			if qScoreShift == prevShift:
+				print 'Calibrated P(error):\t\t','{0:.6f}'.format(modelError),'( phred:',int(-10.*np.log10(modelError)),')'
+				break
+			prevShift = qScoreShift
+
+		# let's adjust the scores on the higher end of the spectrum a bit more
+		#plusMinusQAdj = 0.0
+		#qScoreAdjustments = np.linspace((1-plusMinusQAdj)*sseScalar,(1+plusMinusQAdj)*sseScalar,READLEN).tolist()
+		#for i in xrange(nQscores):
+		#	k = i+qOffset
+		#	comingFrom = [pError[k], int(-10.*np.log10(pError[k]))]
+		#	goingTo    = [qScoreAdjustments[i]*pError[k], int(-10.*np.log10(qScoreAdjustments[i]*pError[k]))]
+		#	if goingTo[0] > 1.0:
+		#		goingTo[0] = 1.0
+		#	if goingTo[1] > nQscores:
+		#		goingTo[1] = nQscores
+		#	elif goingTo[1] < 0:
+		#		goingTo[1] = 0
+		#	print k, comingFrom[0], '-->', goingTo[0], ':', comingFrom[1], '-->', goingTo[1]
+		#	pError[k] = goingTo[0]
+
+		#for k in sorted(pError.keys()):
+		#	comingFrom = (pError[k], int(-10.*np.log10(pError[k])))
+		#	goingTo    = (min([sseScalar*pError[k],1.0]), max([int(-10.*np.log10(sseScalar*pError[k])),0]))
+		#	print k, comingFrom[0], '-->', goingTo[0], ':', comingFrom[1], '-->', goingTo[1]
+		#	pError[k] = sseScalar*pError[k]
 	else:
 		plusMinusSSE = 0.5
 		positionSSErate = np.linspace((1-plusMinusSSE)*AVG_SSE,(1+plusMinusSSE)*AVG_SSE,READLEN).tolist()
@@ -368,7 +484,8 @@ def main():
 	totalInds            = 0
 	totalSTVs            = 0
 	sequencesSampledFrom = 0
-	totalBPSampledFrom   = 0
+	totalBPtargeted      = 0
+	totalBedTargetedBP   = 0
 	# for each sequence in reference fasta file...
 	for n_RI in ref_inds:
 		refName = n_RI[0]
@@ -808,16 +925,35 @@ def main():
 
 
 		# construct regions to sample from (from input bed file, if present)
+		nBedTargetedBP = 0
 		if INPUT_BED != None:
 			bedRegions = []
 			bedfile = open(INPUT_BED,'r')
 			for line in bedfile:
 				splt = line.split('\t')
 				if splt[0] == refName:
+					nBedTargetedBP += int(splt[2])-int(splt[1])
 					origCoords  = ( max([int(splt[1])-MIN_SAMPLE_SIZE, 0]), min([int(splt[2])+MIN_SAMPLE_SIZE, originalLen-1]) )
 					myDatCoords = ( origCoords[0]-addThis[bisect.bisect(afterThis,origCoords[0])-1], origCoords[1]-addThis[bisect.bisect(afterThis,origCoords[1])-1] )
 					#print origCoords,'-->',myDatCoords
-					bedRegions.append(myDatCoords)
+					addMe = 1
+					#
+					#
+					# WARNING: AT THE MOMENT THIS EXPECTS BED INPUT IS SORTED.
+					#
+					#
+					# detect redundant regions
+					for i in xrange(len(bedRegions)):
+						if myDatCoords[0] < bedRegions[i][1]:
+							if myDatCoords[1] <= bedRegions[i][1]:
+								addMe = 0
+								break
+							else:
+								bedRegions[i] = (bedRegions[i][0],myDatCoords[1])
+								addMe = 0
+								break
+					if addMe:
+						bedRegions.append(myDatCoords)
 			bedfile.close()
 			Niters = len(bedRegions)
 
@@ -979,8 +1115,14 @@ def main():
 			q2 = q1
 		nReads = 0
 		nSeqSubErr = 0
+		PRINT_EVERY_PERCENT = 10
+		totalProgress       = PRINT_EVERY_PERCENT
 		for i in xrange(len(myJobRegions)):
-			print (i+1),'/',len(myJobRegions)
+			#print (i+1),'/',len(myJobRegions)
+			if 100.*float(i+1)/len(myJobRegions) >= totalProgress:
+				sys.stdout.write(str(totalProgress)+'% ')
+				sys.stdout.flush()
+				totalProgress += PRINT_EVERY_PERCENT
 
 			(bi,bf)    = myJobRegions[i]
 			readsToAdd = myJobReadsToAdd[i]
@@ -1172,7 +1314,7 @@ def main():
 
 				nReads += 2
 
-		print nReads,'(reads)','{0:.3f} (sec),'.format(time.time()-tt),int((nReads*READLEN)/(time.time()-tt)),'(bp/sec)'
+		print '\n',nReads,'(reads)','{0:.3f} (sec),'.format(time.time()-tt),int((nReads*READLEN)/(time.time()-tt)),'(bp/sec)'
 		if nReads > 0:
 			print 'SSE rate:',float(nSeqSubErr)/(nReads*READLEN)
 
@@ -1277,11 +1419,12 @@ def main():
 			totalInds            += nIndels
 			totalSTVs            += nSVs
 			sequencesSampledFrom += 1
+			totalBedTargetedBP   += nBedTargetedBP
 			if INPUT_BED == None:
-				totalBPSampledFrom     += len(myDat)-myDat.count('N')
+				totalBPtargeted     += len(myDat)-myDat.count('N')
 			else:
 				for region in bedRegions:
-					totalBPSampledFrom += region[1]-region[0]+1
+					totalBPtargeted += region[1]-region[0]
 
 	finalTime = time.time()-startTime
 
@@ -1308,9 +1451,9 @@ def main():
 
 		rfOut.write('Reference:\t\t'+REFERENCE+' ({0:.2f} MB)\n'.format(refSizeMB))
 		if INPUT_BED == None:
-			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+printBasesNicely(totalBPSampledFrom)+' in total)\n')
+			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+printBasesNicely(totalBPtargeted)+' in total)\n')
 		else:
-			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+str(sequencesSampledFrom)+' sampled from, '+printBasesNicely(totalBPSampledFrom)+' in total)\n')
+			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+str(sequencesSampledFrom)+' sampled from, '+printBasesNicely(totalBPtargeted)+' in total)\n')
 		rfOut.write('RunDate:\t\t'+startDate+'\n')
 		rfOut.write('Command:\t\t'+' '.join(sys.argv)+'\n')
 
@@ -1351,7 +1494,7 @@ def main():
 		if INPUT_BED == None:
 			rfOut.write('WindowSize:\t\t'+str(COV_WINDOW)+'\n')
 		else:
-			rfOut.write('Windowing:\t\t'+INPUT_BED+'\n')
+			rfOut.write('Windowing:\t\t'+INPUT_BED+' ('+printBasesNicely(totalBedTargetedBP)+' targeted)\n')
 		rfOut.write('RNG_SEED:\t\t'+str(RNG_SEED)+'\n')
 
 		rfOut.write('\n\n********* STATS *********\n\n')
