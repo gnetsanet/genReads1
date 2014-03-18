@@ -20,9 +20,9 @@ from misc	import histoxy
 GOLDEN_VCF   = 'outData/testData1_results/testDataset1_golden.vcf'
 WORKFLOW_VCF = 'outData/testData1_results/ResultOf_testDataset1_chr1.realrecal.output.bam.chr1.raw.vcf'
 WORKFLOW_BAM = 'outData/testData1_results/testDataset1.wdups.sorted.bam'
-REFERENCE    = 'biocluster_refs/biocluster_UCSC_hg19_chr1.fa'
+REFERENCE    = 'various_data/biocluster_UCSC_hg19_chr1.fa'
 
-MPILEUP_EXEC = '/Users/zach/Desktop/test_data/samtools mpileup'
+MPILEUP_EXEC = '/Users/zach/Desktop/bioinformatics_stuff/samtools mpileup'
 
 BPRANGE = 20
 
@@ -119,6 +119,7 @@ def main():
 	#	elif n[0] >= XLIM[0] and n[0] < XLIM[1]:
 	#		print n
 
+	"""
 	# test to see if any of the FP variants are equivalent to a FN
 	nEquiv = 0
 	delList_i = []
@@ -157,11 +158,66 @@ def main():
 					nEquiv += 1
 					#break
 	nPerfect += nEquiv
+	"""
 
+	delList_i = []
+	delList_j = []
+	regionsToCheck = []
+	for i in xrange(len(FPvariants)):
+		pos = FPvariants[i][0][0]
+		regionsToCheck.append((max([pos-BPRANGE-1,0]),min([pos+BPRANGE,len(myDat)-1])))
+
+	for n in regionsToCheck:
+		refSection = myDat[n[0]:n[1]]
+
+		fpWithin = []
+		for i in xrange(len(FPvariants)):
+			m  = FPvariants[i][0]
+			if (m[0] > n[0] and m[0] < n[1]):
+				fpWithin.append((m,i))
+		fpWithin = sorted(fpWithin)
+		adj = 0
+		altSection = copy.deepcopy(refSection)
+		for (m,i) in fpWithin:
+			lr = len(m[1])
+			la = len(m[2])
+			dpos = m[0]-n[0]+adj
+			altSection = altSection[:dpos-1] + m[2] + altSection[dpos-1+lr:]
+			adj += la-lr
+
+		nfWithin = []
+		for j in xrange(len(notFound)):
+			m = notFound[j]
+			if (m[0] > n[0] and m[0] < n[1]):
+				nfWithin.append((m,j))
+		nfWithin = sorted(nfWithin)
+		adj = 0
+		altSection2 = copy.deepcopy(refSection)
+		for (m,j) in nfWithin:
+			lr = len(m[1])
+			la = len(m[2])
+			dpos = m[0]-n[0]+adj
+			altSection2 = altSection2[:dpos-1] + m[2] + altSection2[dpos-1+lr:]
+			adj += la-lr
+
+		print fpWithin, nfWithin
+		print altSection
+		print altSection2
+		if altSection == altSection2:
+			for (m,i) in fpWithin:
+				if i not in delList_i:
+					delList_i.append(i)
+			for (m,j) in nfWithin:
+				if j not in delList_j:
+					delList_j.append(j)
+
+	nEquiv = 0
 	for i in sorted(delList_i,reverse=True):
 		del FPvariants[i]
 	for j in sorted(delList_j,reverse=True):
 		del notFound[j]
+		nEquiv += 1
+	nPerfect += nEquiv
 
 	print '\n**********************************\n'
 	print 'Total Golden Variants:',totalVariants,'\n'
@@ -174,13 +230,18 @@ def main():
 		print n
 	print '\n**********************************\n'
 	of = open('FN_pos.txt','w')
+
+	nfsnps = 0
 	for n in notFound:
+		if len(n[1]) == len(n[2]):
+			nfsnps += len(n[1])
 		print n,
 		if n in correctCov:
 			print ', DP =',correctCov[n]
 		else:
 			print ''
 		of.write(refName+'\t'+str(n[0])+'\n')
+	print 'rawr:',nfsnps
 	of.close()
 
 

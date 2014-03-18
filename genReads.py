@@ -22,7 +22,7 @@ import time
 import bisect
 import cPickle as pickle
 import numpy as np
-import matplotlib.pyplot as mpl
+#import matplotlib.pyplot as mpl
 import optparse
 
 # absolute path to this script
@@ -49,13 +49,17 @@ DEFAULT_WIN = 1000				# default sliding window size (for sampling reads / comput
 DEFAULT_NHL = 'OMIT'			# default N-handling
 DEFAULT_SER = 0.01				# default average sequencing error rate
 DEFAULT_VRA = 0.00034			# default average rate of variant occurences
+DEFAULT_MBD = 95				# default minimum bed-file region size to consider for targeted sequencing
+DEFAULT_BCV = 0.75				# default ratio of reads that we want to originate from targeted regions
 DEFAULT_QSM = 'qScoreStuff.p'	# default quality-score model
 
 PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -o <out.prefix>',description=DESC,version="%prog v"+str(VERS))
 
 PARSER.add_option('-p',    help='Generate paired-end reads [%default]',               dest='BOOL_PE', default=False,       action='store_true')
 PARSER.add_option('-b',    help='Input bed file containing regions to sample from',   dest='BED',     default=None,        action='store',      metavar='<targets.bed>')
+PARSER.add_option('-B',    help='Minimum bed file region length [%default]',          dest='MBD',     default=DEFAULT_MBD, action='store',      metavar='<int>')
 PARSER.add_option('-c',    help='Average coverage [%default]',                        dest='COV',     default=DEFAULT_COV, action='store',      metavar='<float>')
+PARSER.add_option('-C',    help='Ratio of reads to come from bed regions [%default]', dest='BCV',     default=DEFAULT_BCV, action='store',      metavar='<float>')
 PARSER.add_option('-f',    help='Average fragment length [%default]',                 dest='FLEN',    default=DEFAULT_FLN, action='store',      metavar='<int>')
 PARSER.add_option('-F',    help='Fragment length std [%default]',                     dest='FSTD',    default=DEFAULT_FSD, action='store',      metavar='<int>')
 PARSER.add_option('-l',    help='Read length [%default]',                             dest='RLEN',    default=DEFAULT_RLN, action='store',      metavar='<int>')
@@ -120,14 +124,16 @@ READLEN        = int(OPTS.RLEN)
 FRAGMENT_SIZE  = int(OPTS.FLEN)
 FRAGMENT_STD   = int(OPTS.FSTD)
 COV_WINDOW     = int(OPTS.WIN)
+MIN_PROBE_LEN  = int(OPTS.MBD)
 
 AVG_SSE        = float(OPTS.SER)
 if AVG_SSE != 0.0:
-	SEQUENCING_SNPS   = 1
-	SEQUENCING_INDELS = 0	# not supported yet
+	SEQUENCING_SNPS    = 1
+	SEQUENCING_INDELS  = 0	# not supported yet
 else:
-	SEQUENCING_SNPS   = 0
-	SEQUENCING_INDELS = 0
+	SEQUENCING_SNPS    = 0
+	SEQUENCING_INDELS  = 0
+	SEQUENCING_QSCORES = 0
 
 # consider fragment sizes within +- 3 stds
 MIN_SAMPLE_SIZE = FRAGMENT_SIZE+3*FRAGMENT_STD
@@ -151,6 +157,7 @@ else:
 	RNG_SEED   = int(OPTS.RNG)
 AVG_COVERAGE   = float(OPTS.COV)
 AVG_VAR_FREQ   = float(OPTS.VRA)
+BED_COVERAGE   = float(OPTS.BCV)
 
 if MULTI_JOB:
 	OUTFILE_NAME = OPTS.OUT+'_job'+str(JOB_ID)
@@ -201,10 +208,10 @@ SNP_MUT    = [[0.,   0.15,  0.70,  0.15],
 ///////////////////////////////////////////////////"""
 
 # how are the nucleotides misrepresented if a sub sequencing error occurs?
-SEQ_ERR    = [[0.,   0.4918, 0.3377, 0.1705 ],
-			  [0.5238,   0., 0.2661, 0.2101 ],
-			  [0.3754, 0.2355,   0., 0.3890  ],
-			  [0.2505, 0.2552, 0.4942,  0.  ]]
+SEQ_ERR    = [[0.,     0.4918, 0.3377, 0.1705 ],
+			  [0.5238,     0., 0.2661, 0.2101 ],
+			  [0.3754, 0.2355,     0., 0.3890 ],
+			  [0.2505, 0.2552, 0.4942, 0.     ]]
 
 # probability of sequencing insertion errors (length 1,2,3..)
 SEQ_INS    = [0., 0., 0.]
@@ -275,6 +282,16 @@ if not os.path.isfile(REFERENCE):
 if not os.path.isfile(QSCORE_MODEL):
 	print 'Error: Could not open quality-score model.'
 	exit(1)
+else:
+	maxQScore = pickle.load(open(QSCORE_MODEL,'rb'))[2][-1]
+	maxPerror = 10.**(-maxQScore/10.)
+	if (AVG_SSE > 1.0 or AVG_SSE <= maxPerror) and AVG_SSE != 0.:
+		print 'Error: Average SSE rate must be between: ({0:.6f}, 1.0], or == 0'.format(maxPerror)
+		exit(1)
+
+if BED_COVERAGE <= 0. or BED_COVERAGE > 1.:
+	print 'Error: Targeted region coverage ratio must be between: (0,1]'
+	exit(1)
 
 
 """////////////////////////////////////////////////
@@ -314,9 +331,11 @@ def main():
 		learnedCycles = len(allPMFs)
 		nQscores = len(allPMFs[0])
 
-		print '\nDesired P(error):\t\t','{0:.6f}'.format(AVG_SSE),'( phred:',int(-10.*np.log10(AVG_SSE)),')'
+		targetQscore = int(-10.*np.log10(AVG_SSE))
+		print '\nDesired P(error):\t\t','{0:.6f}'.format(AVG_SSE),'( phred:',targetQscore,')'
 		qScoreShift = 0
 		prevShift   = 0
+		pprevShift  = 0
 		printFirst  = 1
 		while True:
 			initQpmf = copy.deepcopy(allPMFs[0])
@@ -360,7 +379,7 @@ def main():
 				pError[ind] = 10.**(-i/10.)
 			# scale error rates such that the average SSE rate is as desired
 			# this is done by sampling a number of reads and estimating the current average rate
-			sseScaleSample = 10000
+			sseScaleSample = 50000
 			avgError = []
 			for i in xrange(sseScaleSample):
 				q1 = bytearray()
@@ -376,10 +395,12 @@ def main():
 				printFirst = 0
 				print 'Avg P(error) of Input Model:\t','{0:.6f}'.format(modelError),'( phred:',int(-10.*np.log10(modelError)),')'
 
-			if qScoreShift == prevShift:
+			if qScoreShift == prevShift or (qScoreShift == pprevShift and prevShift > qScoreShift):
 				print 'Calibrated P(error):\t\t','{0:.6f}'.format(modelError),'( phred:',int(-10.*np.log10(modelError)),')'
 				break
-			prevShift = qScoreShift
+
+			pprevShift = prevShift
+			prevShift  = qScoreShift
 
 		# let's adjust the scores on the higher end of the spectrum a bit more
 		#plusMinusQAdj = 0.0
@@ -915,24 +936,34 @@ def main():
 			print '{0:.3f} (sec)\n'.format(time.time()-tt)
 
 
-		# init variant coverage dictionaries
+		# initialize variant coverage dictionaries
 		snpKeys = sorted(snps.keys())
 		snpCoverage = {}
+		snpReads    = {}
+		snpTargeted = {}
 		for k in snpKeys:
 			snpCoverage[k] = 0
+			snpReads[k]    = []
 		indelCoverage = [0 for n in indelList]
+		indelReads    = [[] for n in indelList]
+		indelTargeted = {}
 		#print indelList
 
 
 		# construct regions to sample from (from input bed file, if present)
 		nBedTargetedBP = 0
+		targRegions    = []
 		if INPUT_BED != None:
 			bedRegions = []
 			bedfile = open(INPUT_BED,'r')
 			for line in bedfile:
 				splt = line.split('\t')
 				if splt[0] == refName:
-					nBedTargetedBP += int(splt[2])-int(splt[1])
+					regionLen   = int(splt[2])-int(splt[1])
+					if regionLen < MIN_PROBE_LEN:
+						continue
+					nBedTargetedBP += regionLen
+					targRegions.append((int(splt[1]),int(splt[2])))
 					origCoords  = ( max([int(splt[1])-MIN_SAMPLE_SIZE, 0]), min([int(splt[2])+MIN_SAMPLE_SIZE, originalLen-1]) )
 					myDatCoords = ( origCoords[0]-addThis[bisect.bisect(afterThis,origCoords[0])-1], origCoords[1]-addThis[bisect.bisect(afterThis,origCoords[1])-1] )
 					#print origCoords,'-->',myDatCoords
@@ -978,10 +1009,29 @@ def main():
 				alpha = (len(gcp)*AVG_COVERAGE)/sum(targetCov)
 				targetCov = [alpha*n for n in targetCov]
 
+			# so we got coverage in desired regions, let's add a little bit of the rest if desired
+			if BED_COVERAGE < 1.:
+				targetedBpp  = sum(targetCov)*nBedTargetedBP
+				remainderBpp = (1.-BED_COVERAGE)*targetedBpp
+				remainderCov = remainderBpp/(myLen-nBedTargetedBP)
+				gcp = []
+				windowShift = COV_WINDOW-FRAGMENT_SIZE
+				for i in xrange(0,myLen,windowShift):
+					(bi,bf) = (i,i+COV_WINDOW)
+					bedRegions.append((bi,bf))
+					gcp.append(float(myDat[bi:bf].count('C')+myDat[bi:bf].count('G'))/(bf-bi))
+				targetCovR = [RELATIVE_GC_COVERAGE_BIAS[int(100.*n)] for n in gcp]
+				alpha = (len(gcp)*remainderCov)/sum(targetCovR)
+				alpha *= (1.-float(FRAGMENT_SIZE)/COV_WINDOW) # account for window overlap
+				targetCovR = [alpha*n for n in targetCovR]
+				targetCov.extend(targetCovR)
 
 		# determine which windows contain Ns and enumerate their non-N regions
 		if INPUT_BED == None:
 			Niters = len(targetCov)
+		else:
+			Niters = len(bedRegions)
+
 		hasN = {}
 		for i in xrange(Niters):
 
@@ -1111,7 +1161,10 @@ def main():
 
 		tt = time.time()
 		if not SEQUENCING_QSCORES:
-			q1 = bytearray([DUMMY_QSCORE+qOffset]*READLEN)
+			if AVG_SSE == 0.:
+				q1 = bytearray([Qscores[-1]+qOffset]*READLEN)
+			else:
+				q1 = bytearray([DUMMY_QSCORE+qOffset]*READLEN)
 			q2 = q1
 		nReads = 0
 		nSeqSubErr = 0
@@ -1119,7 +1172,7 @@ def main():
 		totalProgress       = PRINT_EVERY_PERCENT
 		for i in xrange(len(myJobRegions)):
 			#print (i+1),'/',len(myJobRegions)
-			if 100.*float(i+1)/len(myJobRegions) >= totalProgress:
+			while 100.*float(i+1)/len(myJobRegions) >= totalProgress:
 				sys.stdout.write(str(totalProgress)+'% ')
 				sys.stdout.flush()
 				totalProgress += PRINT_EVERY_PERCENT
@@ -1160,12 +1213,20 @@ def main():
 					(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
 
 					for sk in relevantSNP:
-						if (sk >= r1i and sk < r1f) or (sk >= r2i and sk < r2f):
+						if (sk >= r1i and sk < r1f):
+							snpReads[sk].append(str(nReads+myJobOffset+bigReadNameOffset)+'/1')
+							snpCoverage[sk] += 1
+						elif (sk >= r2i and sk < r2f):
+							snpReads[sk].append(str(nReads+myJobOffset+bigReadNameOffset)+'/2')
 							snpCoverage[sk] += 1
 					for j in xrange(len(hitInds)):
 						indStart = hitInds[j][2]
-						if (indStart >= r1i and indStart < r1f) or (indStart >= r2i and indStart < r2f):
+						if (indStart >= r1i and indStart < r1f):
 							indelCoverage[j+afwi/2] += 1
+							indelReads[j+afwi/2].append(str(nReads+myJobOffset+bigReadNameOffset)+'/1')
+						elif (indStart >= r2i and indStart < r2f):
+							indelCoverage[j+afwi/2] += 1
+							indelReads[j+afwi/2].append(str(nReads+myJobOffset+bigReadNameOffset)+'/2')
 
 				# readData
 				r1 = bytearray(currentDat[n0:n0+READLEN])
@@ -1351,19 +1412,30 @@ def main():
 					idT = SVsToAttempt[svi][1]
 					svidNum = SVids[idT]
 					outDat = ()
+
 					if svi not in SVsAccountedFor:
 						SVsAccountedFor[svi] = 1
+
+						VarTargeted = ''
+						for tRegion in targRegions:
+							if Svv[0] <= tRegion[1] and Svv[0] >= tRegion[0]:
+								VarTargeted = ';TARGETED=1'
+								break
+						VarReads = ''
+						if len(indelReads[i]) > 0:
+							VarReads = ';READS='+','.join(indelReads[i])
+
 						if idT == 'BI':
 							#print 'BigInsert', Svv
 							newStr = str(myDat[myInd:myInd+len(Svv[1])+1])
 							outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','SVTYPE=INS;END='+str(Svv[0])+';SVLEN='+str(len(Svv[1])))
 							if (int(outDat[1]),outDat[3],outDat[4]) in input_inds:
-								outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i]))
+								outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
 						elif idT == 'BD':
 							#print 'BigDeletion', Svv
 							outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','SVTYPE=DEL;END='+str(Svv[0]+Svv[1])+';SVLEN='+str(-Svv[1]))
 							if (int(outDat[1]),outDat[3],outDat[4]) in input_inds:
-								outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i]))
+								outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
 						elif idT == 'R':
 							#print 'Repeat', Svv
 							newStr = str(myDat[myInd:myInd+len(Svv[1])*Svv[2]+1])
@@ -1386,21 +1458,41 @@ def main():
 							outDat = (refName,str(Svv[2]),event,origBase,'<TRANS>','.','PASS','SVTYPE=TRANS;END='+str(Svv[2])+';SVLEN='+str(Svv[1])+';TRANSREF='+refName+';TRANSPOS='+str(Svv[0]))
 						SVids[idT] += 1
 				else:
+					VarTargeted = ''
+					for tRegion in targRegions:
+						if origInd <= tRegion[1] and origInd >= tRegion[0]:
+							VarTargeted = ';TARGETED=1'
+							break
+					VarReads = ''
+					if len(indelReads[i]) > 0:
+						VarReads = ';READS='+','.join(indelReads[i])
+
 					if n[0] == 'D':
-						outDat = (refName,str(origInd),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i]))
+						outDat = (refName,str(origInd),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
 
 					elif n[0] == 'I':
 						newStr = str(myDat[myInd:myInd+n[1]+1])
-						outDat = (refName,str(origInd),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i]))
+						outDat = (refName,str(origInd),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
 
 				if outDat != ():
 					allVariants.append(outDat)
 
 			for k in snpKeys:
 				if snpsAccountedFor[k] == 0:
-					spos = snps[k][2]
-					si = bisect.bisect(afterThis,spos)-1
-					outDat = (refName,str(spos+addThis[si]+1),'.',chr(snps[k][0]).upper(),chr(myDat[spos]),'.','PASS','DP='+str(snpCoverage[k]))
+					spos    = snps[k][2]
+					si      = bisect.bisect(afterThis,spos)-1
+					origInd = spos+addThis[si]+1
+
+					VarTargeted = ''
+					for tRegion in targRegions:
+						if origInd <= tRegion[1] and origInd >= tRegion[0]:
+							VarTargeted = ';TARGETED=1'
+							break
+					VarReads = ''
+					if len(snpReads[k]) > 0:
+						VarReads = ';READS='+','.join(snpReads[k])
+
+					outDat = (refName,str(origInd),'.',chr(snps[k][0]).upper(),chr(myDat[spos]),'.','PASS','DP='+str(snpCoverage[k])+VarTargeted+VarReads)
 					#print outDat
 					allVariants.append(outDat)
 
