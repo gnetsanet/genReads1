@@ -136,7 +136,10 @@ else:
 	SEQUENCING_QSCORES = 0
 
 # consider fragment sizes within +- 3 stds
-MIN_SAMPLE_SIZE = FRAGMENT_SIZE+3*FRAGMENT_STD
+if PAIRED_END:
+	MIN_SAMPLE_SIZE = FRAGMENT_SIZE+3*FRAGMENT_STD
+else:
+	MIN_SAMPLE_SIZE = READLEN*2
 
 if FRAGMENT_STD == 0:
 	FRAGLEN         = [FRAGMENT_SIZE]
@@ -174,7 +177,10 @@ else:
 #   of a SNP occuring could be between 0.9*SNP_FREQ and 1.1*SNP_FREQ
 RNG_MULT   = .05
 # like RNG_MULT, but with coverage
-COV_MULT   = .1
+if GC_BIAS:
+	COV_MULT   = .1
+else:
+	COV_MULT   = .05
 
 # dummy quality score if no model is used
 DUMMY_QSCORE = 30
@@ -271,9 +277,9 @@ if PAIRED_END:
 	if COV_WINDOW <= FRAGMENT_SIZE+3*FRAGMENT_STD:
 		print 'Error: Window size must be at least FRAGMENT_LEN + 3*FRAGMENT_STD'
 		exit(1)
-else:
-	print 'Error: Single-End reads not supported yet, sorry :('
-	exit(1)
+#else:
+#	print 'Error: Single-End reads not supported yet, sorry :('
+#	exit(1)
 
 if not os.path.isfile(REFERENCE):
 	print 'Error: Could not open reference file.'
@@ -470,7 +476,8 @@ def main():
 	sys.stdout.flush()
 	tt = time.time()
 	OUTFQ1 = open(OUTFILE_NAME+'_read1.fq','wb')
-	OUTFQ2 = open(OUTFILE_NAME+'_read2.fq','wb')
+	if PAIRED_END:
+		OUTFQ2 = open(OUTFILE_NAME+'_read2.fq','wb')
 	if SAVE_SAM:
 		OUTSAM = open(OUTFILE_NAME+'_golden.sam','wb')
 		OUTSAM.write('@HD\tVN:1.0\tSO:unsorted\n')
@@ -990,15 +997,18 @@ def main():
 
 
 		# compute GC % of each window
+		if PAIRED_END:
+			windowShift = COV_WINDOW-FRAGMENT_SIZE
+		else:
+			windowShift = COV_WINDOW-READLEN
 		gcp = []
 		if INPUT_BED == None:
-			windowShift = COV_WINDOW-FRAGMENT_SIZE
 			for i in xrange(0,myLen,windowShift):
 				(bi,bf) = (i,i+COV_WINDOW)
 				gcp.append(float(myDat[bi:bf].count('C')+myDat[bi:bf].count('G'))/(bf-bi))
 			targetCov = [RELATIVE_GC_COVERAGE_BIAS[int(100.*n)] for n in gcp]
 			alpha = (len(gcp)*AVG_COVERAGE)/sum(targetCov)
-			alpha *= (1.-float(FRAGMENT_SIZE)/COV_WINDOW) # account for window overlap
+			alpha *= float(windowShift)/COV_WINDOW # account for window overlap
 			targetCov = [alpha*n for n in targetCov]
 		else:
 			for i in xrange(len(bedRegions)):
@@ -1015,14 +1025,13 @@ def main():
 				remainderBpp = (1.-BED_COVERAGE)*targetedBpp
 				remainderCov = remainderBpp/(myLen-nBedTargetedBP)
 				gcp = []
-				windowShift = COV_WINDOW-FRAGMENT_SIZE
 				for i in xrange(0,myLen,windowShift):
 					(bi,bf) = (i,i+COV_WINDOW)
 					bedRegions.append((bi,bf))
 					gcp.append(float(myDat[bi:bf].count('C')+myDat[bi:bf].count('G'))/(bf-bi))
 				targetCovR = [RELATIVE_GC_COVERAGE_BIAS[int(100.*n)] for n in gcp]
 				alpha = (len(gcp)*remainderCov)/sum(targetCovR)
-				alpha *= (1.-float(FRAGMENT_SIZE)/COV_WINDOW) # account for window overlap
+				alpha *= float(windowShift)/COV_WINDOW # account for window overlap
 				targetCovR = [alpha*n for n in targetCovR]
 				targetCov.extend(targetCovR)
 
@@ -1148,9 +1157,13 @@ def main():
 
 					currentLen = bf-bi
 					currentCov = ((random.random()-.5)*(2*COV_MULT) + 1.)*targetCov[j]*cm
-					readsToAdd = int((currentLen*currentCov)/(2*READLEN)+0.5)
+					if PAIRED_END:
+						readsToAdd = int((currentLen*currentCov)/(2*READLEN)+0.5)
+						jobReadCount += readsToAdd*2
+					else:
+						readsToAdd = int((currentLen*currentCov)/(READLEN)+0.5)
+						jobReadCount += readsToAdd
 					#print (currentLen,readsToAdd)
-					jobReadCount += readsToAdd*2
 
 					if i == JOB_ID-1:
 						myJobReadsToAdd.append(readsToAdd)
@@ -1201,22 +1214,26 @@ def main():
 
 			for rta in xrange(readsToAdd):
 
-				fl = FRAGLEN[randEvent(cpFrag)]
-				n0 = random.randint(0,len(currentDat)-fl-1)
-				revoff = len(currentDat)-n0-fl
-
-				r1posMyDat = bi+n0+1
-				r2posMyDat = bi+n0+1+fl-READLEN
+				if PAIRED_END:
+					fl = FRAGLEN[randEvent(cpFrag)]
+					n0 = random.randint(0,len(currentDat)-fl-1)
+					revoff = len(currentDat)-n0-fl
+					r1posMyDat = bi+n0+1
+					r2posMyDat = bi+n0+1+fl-READLEN
+				else:
+					n0 = random.randint(0,len(currentDat)-READLEN-1)
+					r1posMyDat = bi+n0+1
 
 				if SAVE_VCF:
 					(r1i, r1f) = (r1posMyDat, r1posMyDat+READLEN)
-					(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
+					if PAIRED_END:
+						(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
 
 					for sk in relevantSNP:
 						if (sk >= r1i and sk < r1f):
 							snpReads[sk].append(str(nReads+myJobOffset+bigReadNameOffset)+'/1')
 							snpCoverage[sk] += 1
-						elif (sk >= r2i and sk < r2f):
+						elif PAIRED_END and (sk >= r2i and sk < r2f):
 							snpReads[sk].append(str(nReads+myJobOffset+bigReadNameOffset)+'/2')
 							snpCoverage[sk] += 1
 					for j in xrange(len(hitInds)):
@@ -1224,54 +1241,79 @@ def main():
 						if (indStart >= r1i and indStart < r1f):
 							indelCoverage[j+afwi/2] += 1
 							indelReads[j+afwi/2].append(str(nReads+myJobOffset+bigReadNameOffset)+'/1')
-						elif (indStart >= r2i and indStart < r2f):
+						elif PAIRED_END and (indStart >= r2i and indStart < r2f):
 							indelCoverage[j+afwi/2] += 1
 							indelReads[j+afwi/2].append(str(nReads+myJobOffset+bigReadNameOffset)+'/2')
 
 				# readData
 				r1 = bytearray(currentDat[n0:n0+READLEN])
-				r2 = bytearray(currentDatRC[revoff:revoff+READLEN])
 				r1Name = refName+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/1'
-				r2Name = refName+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/2'
+				if PAIRED_END:
+					r2 = bytearray(currentDatRC[revoff:revoff+READLEN])
+					r2Name = refName+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/2'
 
 				# quality scores
-				if SEQUENCING_QSCORES:
-					q1 = bytearray()
-					q2 = bytearray()
-					q1.append(randEvent(initQProb)+qOffset)
-					q2.append(randEvent(initQProb)+qOffset)
-					for j in xrange(1,READLEN):
-						qscore1 = randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset
-						qscore2 = randEvent(allQscoreCumProb[j*nQscores+q2[j-1]])+qOffset
-						q1.append(qscore1)
-						q2.append(qscore2)
+				if PAIRED_END:
+					if SEQUENCING_QSCORES:
+						q1 = bytearray()
+						q2 = bytearray()
+						q1.append(randEvent(initQProb)+qOffset)
+						q2.append(randEvent(initQProb)+qOffset)
+						for j in xrange(1,READLEN):
+							qscore1 = randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset
+							qscore2 = randEvent(allQscoreCumProb[j*nQscores+q2[j-1]])+qOffset
+							q1.append(qscore1)
+							q2.append(qscore2)
 
-						# introduce sequencing SNPS based on their quality score
+							# introduce sequencing SNPS based on their quality score
+							if SEQUENCING_SNPS:
+								if random.random() < pError[qscore1]:
+									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
+									nSeqSubErr += 1
+								if random.random() < pError[qscore2]:
+									r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
+									nSeqSubErr += 1
+					else:
+						# if no q-scores, introduce SNPS based on desired average frequency
 						if SEQUENCING_SNPS:
-							if random.random() < pError[qscore1]:
-								r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
-								nSeqSubErr += 1
-							if random.random() < pError[qscore2]:
-								r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
-								nSeqSubErr += 1
-				else:
-					# if no q-scores, introduce SNPS based on desired average frequency
-					if SEQUENCING_SNPS:
-						for j in xrange(READLEN):
-							if random.random() < positionSSErate[j]:
-								r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
-								nSeqSubErr += 1
-							if random.random() < positionSSErate[j]:
-								r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
-								nSeqSubErr += 1
+							for j in xrange(READLEN):
+								if random.random() < positionSSErate[j]:
+									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
+									nSeqSubErr += 1
+								if random.random() < positionSSErate[j]:
+									r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
+									nSeqSubErr += 1
+					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
+					OUTFQ2.write('@'+r2Name+'\n'+r2+'\n+\n'+q2+'\n')
 
-				OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
-				OUTFQ2.write('@'+r2Name+'\n'+r2+'\n+\n'+q2+'\n')
+				# single-end reads. (ewww code copy-pasting, I'm sorry..)
+				else:
+					if SEQUENCING_QSCORES:
+						q1 = bytearray()
+						q1.append(randEvent(initQProb)+qOffset)
+						for j in xrange(1,READLEN):
+							qscore1 = randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset
+							q1.append(qscore1)
+							if SEQUENCING_SNPS:
+								if random.random() < pError[qscore1]:
+									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
+									nSeqSubErr += 1
+					else:
+						if SEQUENCING_SNPS:
+							for j in xrange(READLEN):
+								if random.random() < positionSSErate[j]:
+									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
+									nSeqSubErr += 1
+					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
 
 				if SAVE_SAM:
 
 					cigarsAndAdjustedPos = []
-					for rp in [r1posMyDat,r2posMyDat]:
+					if PAIRED_END:
+						rtt = [r1posMyDat,r2posMyDat]
+					else:
+						rtt = [r1posMyDat]
+					for rp in rtt:
 						# I want to get nucleotides 'ni' to 'nf' from our modified reference and get the
 						# corresponding bases from the original reference, as well as a cigar string that relates them
 						ni = rp
@@ -1341,39 +1383,61 @@ def main():
 						cigarsAndAdjustedPos.extend([nir,myCigar])
 
 					#print cigarsAndAdjustedPos
-					[r1pos, cigar1, r2pos, cigar2] = cigarsAndAdjustedPos
+					if PAIRED_END:
+						[r1pos, cigar1, r2pos, cigar2] = cigarsAndAdjustedPos
 
-					samFlag1 = str(int('001100011',2))
-					pos1     = str(r1pos)	# position of first matching base
-					mapQ1    = str(70)		# set to max value
-					mateRef  = '='			# read and mate have same reference
-					matePos1 = str(r2pos)	# position of mates right-most matching base
-					tLen1    = str(fl)
-					seq1     = str(r1)
-					qstr1    = str(q1)
-					aln1     = ''			# no special alignment info..
+						samFlag1 = str(int('001100011',2))
+						pos1     = str(r1pos)	# position of first matching base
+						mapQ1    = str(70)		# set to max value
+						mateRef  = '='			# read and mate have same reference
+						matePos1 = str(r2pos)	# position of mates right-most matching base
+						tLen1    = str(fl)
+						seq1     = str(r1)
+						qstr1    = str(q1)
+						aln1     = ''			# no special alignment info..
 
-					outData  = [r1Name[:-2],samFlag1,refName,pos1,mapQ1,cigar1,mateRef,matePos1,tLen1,seq1,qstr1,aln1]
-					outData  = [n for n in outData if n != '']
-					OUTSAM.write('\t'.join(outData))
-					OUTSAM.write('\n')
+						outData  = [r1Name[:-2],samFlag1,refName,pos1,mapQ1,cigar1,mateRef,matePos1,tLen1,seq1,qstr1,aln1]
+						outData  = [n for n in outData if n != '']
+						OUTSAM.write('\t'.join(outData))
+						OUTSAM.write('\n')
 
-					samFlag2 = str(int('010010011',2))
-					pos2     = str(r2pos)
-					mapQ2    = str(70)
-					mateRef  = '='
-					matePos2 = str(r1pos)
-					tLen2    = str(-fl)
-					seq2     = str(bytearray([TO_UPPER_COMP[n] for n in r2[::-1]]))
-					qstr2    = str(q2)
-					aln2     = ''
+						samFlag2 = str(int('010010011',2))
+						pos2     = str(r2pos)
+						mapQ2    = str(70)
+						mateRef  = '='
+						matePos2 = str(r1pos)
+						tLen2    = str(-fl)
+						seq2     = str(bytearray([TO_UPPER_COMP[n] for n in r2[::-1]]))
+						qstr2    = str(q2)
+						aln2     = ''
 
-					outData  = [r1Name[:-2],samFlag2,refName,pos2,mapQ2,cigar2,mateRef,matePos2,tLen2,seq2,qstr2,aln2]
-					outData  = [n for n in outData if n != '']
-					OUTSAM.write('\t'.join(outData))
-					OUTSAM.write('\n')
+						outData  = [r1Name[:-2],samFlag2,refName,pos2,mapQ2,cigar2,mateRef,matePos2,tLen2,seq2,qstr2,aln2]
+						outData  = [n for n in outData if n != '']
+						OUTSAM.write('\t'.join(outData))
+						OUTSAM.write('\n')
 
-				nReads += 2
+					else:
+						[r1pos, cigar1] = cigarsAndAdjustedPos
+
+						samFlag1 = str(int('001100000',2))
+						pos1     = str(r1pos)
+						mapQ1    = str(70)
+						mateRef  = '*'
+						matePos1 = str(0)
+						tLen1    = str(0)
+						seq1     = str(r1)
+						qstr1    = str(q1)
+						aln1     = ''
+
+						outData  = [r1Name[:-2],samFlag1,refName,pos1,mapQ1,cigar1,mateRef,matePos1,tLen1,seq1,qstr1,aln1]
+						outData  = [n for n in outData if n != '']
+						OUTSAM.write('\t'.join(outData))
+						OUTSAM.write('\n')
+
+				if PAIRED_END:
+					nReads += 2
+				else:
+					nReads += 1
 
 		print '\n',nReads,'(reads)','{0:.3f} (sec),'.format(time.time()-tt),int((nReads*READLEN)/(time.time()-tt)),'(bp/sec)'
 		if nReads > 0:
@@ -1523,7 +1587,8 @@ def main():
 	# close files
 	REFFILE.close()
 	OUTFQ1.close()
-	OUTFQ2.close()
+	if PAIRED_END:
+		OUTFQ2.close()
 	if SAVE_SAM:
 		OUTSAM.close()
 	if SAVE_VCF:
@@ -1539,7 +1604,8 @@ def main():
 
 		refSizeMB = float(os.path.getsize(REFERENCE))/1000/1000
 		fq1SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read1.fq'))/1000/1000/1000
-		fq2SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read2.fq'))/1000/1000/1000
+		if PAIRED_END:
+			fq2SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read2.fq'))/1000/1000/1000
 
 		rfOut.write('Reference:\t\t'+REFERENCE+' ({0:.2f} MB)\n'.format(refSizeMB))
 		if INPUT_BED == None:
@@ -1550,7 +1616,9 @@ def main():
 		rfOut.write('Command:\t\t'+' '.join(sys.argv)+'\n')
 
 		rfOut.write('\n\n********* FILES GENERATED *********\n\n')
-		rfOut.write('Read files:\t\t'+OUTFILE_NAME+'_read1.fq ({0:.2f} GB)\n\t\t\t\t'.format(fq1SizeGB)+OUTFILE_NAME+'_read2.fq ({:.2f} GB)\n'.format(fq2SizeGB))
+		rfOut.write('Read files:\t\t'+OUTFILE_NAME+'_read1.fq ({0:.2f} GB)\n\t\t\t\t'.format(fq1SizeGB))
+		if PAIRED_END:
+			rfOut.write(OUTFILE_NAME+'_read2.fq ({:.2f} GB)\n'.format(fq2SizeGB))
 		if SAVE_CORRECT_REF:
 			crSizeMB = float(os.path.getsize(OUTFILE_NAME+'_correctRef.fa'))/1000/1000
 			rfOut.write('\nRef + Variants:\t'+OUTFILE_NAME+'_correctRef.fa ({0:.2f} MB)\n'.format(crSizeMB))
@@ -1563,8 +1631,9 @@ def main():
 
 		rfOut.write('\n\n********* PARAMETERS *********\n\n')
 		rfOut.write('ReadLen:\t\t'+str(READLEN)+'\n')
-		rfOut.write('MeanFragLen:\t'+str(FRAGMENT_SIZE)+'\n')
-		rfOut.write('FragLen Std:\t'+str(FRAGMENT_STD)+'\n')
+		if PAIRED_END:
+			rfOut.write('MeanFragLen:\t'+str(FRAGMENT_SIZE)+'\n')
+			rfOut.write('FragLen Std:\t'+str(FRAGMENT_STD)+'\n')
 		rfOut.write('Avg Coverage:\t'+str(AVG_COVERAGE)+'x\n')
 		rfOut.write('N Handling:\t\t'+HANDLE_N+'\n')
 		rfOut.write('Variant Freq:\t'+str(AVG_VAR_FREQ)+'\n')

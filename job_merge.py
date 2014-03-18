@@ -73,7 +73,7 @@ def main():
 	if len(samList) > 0:
 		of.close()
 
-	variantCov = {}
+	variantInf = {}
 	for fn in vcfList:
 		f = open(fn,'r')
 		fch = ''
@@ -92,13 +92,28 @@ def main():
 			splt = n.split('\t')
 			if len(splt) == 8:
 				var  = (splt[0],splt[1],splt[2],splt[3],splt[4],splt[5],splt[6])
-				if var in variantCov:
-					variantCov[var] += int(splt[7][3:])
+				if var in variantInf:
+					variantInf[var] += splt[7]+';'
 				else:
-					variantCov[var] = int(splt[7][3:])
+					variantInf[var] = splt[7]+';'
+
+	for n in variantInf.keys():
+		targeted = ''
+		coverage = ''
+		readsCov = ''
+		soi = variantInf[n]
+
+		coverage = 'DP='+str(sum([int(m[3:]) for m in re.findall(r"(DP=.*?)(?=;)",soi)]))
+
+		if 'TARGETED=1' in soi:
+			targeted = 'TARGETED=1;'
+
+		readsCov = 'READS=' + ','.join([m[6:] for m in re.findall(r"(READS=.*?)(?=;)",soi)])
+
+		variantInf[n] = coverage+';'+targeted+readsCov
 
 	if len(vcfList) > 0:
-		allVariants = [(n[0],n[1],n[2],n[3],n[4],n[5],n[6],'DP='+str(variantCov[n])) for n in variantCov.keys()]
+		allVariants = [(n[0],n[1],n[2],n[3],n[4],n[5],n[6],variantInf[n]) for n in variantInf.keys()]
 
 		allVariants = [x for (y,x) in sorted(zip([int(n[1]) for n in allVariants],allVariants))]
 

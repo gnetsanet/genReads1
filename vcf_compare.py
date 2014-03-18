@@ -5,6 +5,12 @@
 
 vcf_compare.py
 
+- compare vcf file produced by workflow to golden vcf produced by simulator
+
+Written by:		Zach Stephens
+Date:			I forget.
+Contact:		zstephe2@illinois.edu
+
 ************************************************** """
 
 import sys
