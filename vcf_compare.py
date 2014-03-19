@@ -8,8 +8,13 @@ vcf_compare.py
 - compare vcf file produced by workflow to golden vcf produced by simulator
 
 Written by:		Zach Stephens
-Date:			I forget.
+Date:			February 13, 2014
 Contact:		zstephe2@illinois.edu
+
+
+Usage:
+
+python vcf_compare.py ref.fa golden.vcf workflow.vcf workflow.bam
 
 ************************************************** """
 
@@ -19,20 +24,29 @@ import copy
 import time
 import re
 import numpy as np
-import matplotlib.pyplot as mpl
+#import matplotlib.pyplot as mpl
 
 from misc	import histoxy
 
-GOLDEN_VCF   = 'outData/testData1_results/testDataset1_golden.vcf'
-WORKFLOW_VCF = 'outData/testData1_results/ResultOf_testDataset1_chr1.realrecal.output.bam.chr1.raw.vcf'
-WORKFLOW_BAM = 'outData/testData1_results/testDataset1.wdups.sorted.bam'
-REFERENCE    = 'various_data/biocluster_UCSC_hg19_chr1.fa'
+#GOLDEN_VCF   = 'outData/testData1_results/testDataset1_golden.vcf'
+#WORKFLOW_VCF = 'outData/testData1_results/ResultOf_testDataset1_chr1.realrecal.output.bam.chr1.raw.vcf'
+#WORKFLOW_BAM = 'outData/testData1_results/testDataset1.wdups.sorted.bam'
+#REFERENCE    = 'various_data/biocluster_UCSC_hg19_chr1.fa'
 
 MPILEUP_EXEC = '/Users/zach/Desktop/bioinformatics_stuff/samtools mpileup'
 
 BPRANGE = 20
 
 def main():
+
+	if len(sys.argv) != 5:
+		print '\nUsage:\n\npython vcf_compare.py ref.fa golden.vcf workflow.vcf workflow.bam\n'
+		exit(1)
+
+	GOLDEN_VCF   = sys.argv[2]
+	WORKFLOW_VCF = sys.argv[3]
+	WORKFLOW_BAM = sys.argv[4]
+	REFERENCE    = sys.argv[1]
 
 	ref = []
 	f = open(REFERENCE,'r')
@@ -105,66 +119,10 @@ def main():
 			correctHashed[var] = 2
 		else:
 			FPvariants.append([var,extraInfo])
-	print '\n**********************************\n'
+
 
 	notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 
-	#print len(notFound),'+',len(FPvariants),'=',len(notFound)+len(FPvariants)
-	#print nPerfect
-
-	#XLIM = [800000,1000000]
-	#for n in notFound:
-	#	if n[0] > XLIM[1]:
-	#		break
-	#	elif n[0] >= XLIM[0] and n[0] < XLIM[1]:
-	#		print n
-	#print '\n---------------\n'
-	#for (n,ei) in FPvariants:
-	#	if n[0] > XLIM[1]:
-	#		break
-	#	elif n[0] >= XLIM[0] and n[0] < XLIM[1]:
-	#		print n
-
-	"""
-	# test to see if any of the FP variants are equivalent to a FN
-	nEquiv = 0
-	delList_i = []
-	delList_j = []
-	for i in xrange(len(FPvariants)):
-		#print FPvariants[i]
-		pos = FPvariants[i][0][0]
-		lr  = len(FPvariants[i][0][1])
-		refSection = myDat[pos-BPRANGE-1:pos+BPRANGE]
-		altSection = refSection[:BPRANGE] + FPvariants[i][0][2] + refSection[BPRANGE+lr:]
-		altSection = str(altSection)
-		#print altSection
-
-		for j in xrange(len(notFound)):
-			pos2 = notFound[j][0]
-			lr2  = len(notFound[j][1])
-			if abs(pos-pos2) <= 2*BPRANGE:
-				dpos = pos-pos2
-				#print 'rawr',dpos
-				#print notFound[j]
-				#print refSection[:BPRANGE+dpos], BPRANGE+dpos
-				#print refSection[BPRANGE+dpos:BPRANGE+dpos+lr2], BPRANGE+dpos+lr2
-				#print refSection[BPRANGE+dpos+lr2:]
-				altSection2 = refSection[:BPRANGE-dpos] + notFound[j][2] + refSection[BPRANGE-dpos+lr2:]
-				altSection2 = str(altSection2)
-				#print refSection
-				#print altSection
-				#print altSection2
-				if altSection2 == altSection:
-					#print 'we have a winner, jerry!'
-					#print FPvariants[i], notFound[j]
-					#print refSection
-					#print altSection
-					delList_i.append(i)
-					delList_j.append(j)
-					nEquiv += 1
-					#break
-	nPerfect += nEquiv
-	"""
 
 	delList_i = []
 	delList_j = []
@@ -206,9 +164,9 @@ def main():
 			altSection2 = altSection2[:dpos-1] + m[2] + altSection2[dpos-1+lr:]
 			adj += la-lr
 
-		print fpWithin, nfWithin
-		print altSection
-		print altSection2
+		#print fpWithin, nfWithin
+		#print altSection
+		#print altSection2
 		if altSection == altSection2:
 			for (m,i) in fpWithin:
 				if i not in delList_i:
@@ -230,8 +188,9 @@ def main():
 	print 'Perfect Matches:',nPerfect,'({:.2f}%)'.format(100.*float(nPerfect)/totalVariants)
 	print 'FP variants:   ',len(FPvariants),'({:.2f}%)'.format(100.*float(len(FPvariants))/totalVariants)
 	print 'FN variants:   ',len(notFound),'({:.2f}%)'.format(100.*float(len(notFound))/totalVariants)
-	print '\nNumber of equivalent variants denoted differently:',nEquiv,'\n'
-
+	print '\nNumber of equivalent variants denoted differently:',nEquiv
+	print '\n**********************************\n'
+	
 	for n in FPvariants:
 		print n
 	print '\n**********************************\n'
@@ -257,33 +216,11 @@ def main():
 	cmd = MPILEUP_EXEC+' -l FN_pos.txt '+WORKFLOW_BAM+' 1>pileOut.txt'
 	#os.system(cmd)
 
-	f = open('pileOut.txt','r')
-	for line in f:
-		print line
-	f.close()
+	#f = open('pileOut.txt','r')
+	#for line in f:
+	#	print line
+	#f.close()
 
-	#mpl.figure(0)
-	#mpl.subplot(211)
-	#ind = []
-	#err = []
-	#for n in notFound:
-	#	ind.extend([n[0]-1,n[0],n[0]+1])
-	#	err.extend([0,1,0])
-	#mpl.plot(ind,err)
-	#mpl.xlim(XLIM)
-	#mpl.title('False negatives')
-
-	#mpl.subplot(212)
-	#ind = []
-	#err = []
-	#for n in FPvariants:
-	#	ind.extend([n[0][0]-1,n[0][0],n[0][0]+1])
-	#	err.extend([0,1,0])
-	#mpl.plot(ind,err)
-	#mpl.xlim(XLIM)
-	#mpl.title('False positives')
-
-	#mpl.show()
 
 if __name__ == '__main__':
 	main()

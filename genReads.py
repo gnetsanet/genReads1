@@ -1224,33 +1224,11 @@ def main():
 					n0 = random.randint(0,len(currentDat)-READLEN-1)
 					r1posMyDat = bi+n0+1
 
-				if SAVE_VCF:
-					(r1i, r1f) = (r1posMyDat, r1posMyDat+READLEN)
-					if PAIRED_END:
-						(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
-
-					for sk in relevantSNP:
-						if (sk >= r1i and sk < r1f):
-							snpReads[sk].append(str(nReads+myJobOffset+bigReadNameOffset)+'/1')
-							snpCoverage[sk] += 1
-						elif PAIRED_END and (sk >= r2i and sk < r2f):
-							snpReads[sk].append(str(nReads+myJobOffset+bigReadNameOffset)+'/2')
-							snpCoverage[sk] += 1
-					for j in xrange(len(hitInds)):
-						indStart = hitInds[j][2]
-						if (indStart >= r1i and indStart < r1f):
-							indelCoverage[j+afwi/2] += 1
-							indelReads[j+afwi/2].append(str(nReads+myJobOffset+bigReadNameOffset)+'/1')
-						elif PAIRED_END and (indStart >= r2i and indStart < r2f):
-							indelCoverage[j+afwi/2] += 1
-							indelReads[j+afwi/2].append(str(nReads+myJobOffset+bigReadNameOffset)+'/2')
 
 				# readData
 				r1 = bytearray(currentDat[n0:n0+READLEN])
-				r1Name = refName+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/1'
 				if PAIRED_END:
 					r2 = bytearray(currentDatRC[revoff:revoff+READLEN])
-					r2Name = refName+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/2'
 
 				# quality scores
 				if PAIRED_END:
@@ -1283,8 +1261,6 @@ def main():
 								if random.random() < positionSSErate[j]:
 									r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
 									nSeqSubErr += 1
-					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
-					OUTFQ2.write('@'+r2Name+'\n'+r2+'\n+\n'+q2+'\n')
 
 				# single-end reads. (ewww code copy-pasting, I'm sorry..)
 				else:
@@ -1304,87 +1280,123 @@ def main():
 								if random.random() < positionSSErate[j]:
 									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
 									nSeqSubErr += 1
+
+
+				cigarsAndAdjustedPos = []
+				if PAIRED_END:
+					rtt = [r1posMyDat,r2posMyDat]
+				else:
+					rtt = [r1posMyDat]
+				for rp in rtt:
+					# I want to get nucleotides 'ni' to 'nf' from our modified reference and get the
+					# corresponding bases from the original reference, as well as a cigar string that relates them
+					ni = rp
+					nf = rp+READLEN		# ni + READLEN
+
+					if len(relevantAT) == 0:
+						if len(indelList) > 0:
+							if afwi == len(addThis):
+								ni += addThis[-1]
+							else:
+								ni += addThis[afwi]
+						cigarsAndAdjustedPos.extend([ni,str(READLEN)+'M'])
+						continue
+
+					ptbi = bisect.bisect(relevantAT,ni)-1
+					#if ni in relevantAT:
+					#	ptbi -= 1
+					ptbf = bisect.bisect(relevantAT,nf)-1
+					if nf in relevantAT:
+						ptbf -= 1
+					ptbi += afwi
+					ptbf += afwi
+					nir = ni+addThis[ptbi]
+					nfr = nf+addThis[ptbf]
+
+					bpi = ptbi/2
+					bpf = min([ptbf/2,len(indelList)-1])
+					affectedBp = indelList[bpi:bpf]
+					# make sure we catch insertions near end of read
+					if indelList[bpf][2]+1 < nf:
+						affectedBp.append(indelList[bpf])
+
+					myCigar = ''
+					soFar = ni
+					for n in affectedBp:
+						chunkSize = n[2]-soFar+1
+						if chunkSize > 0:
+							soFar += chunkSize
+							myCigar = myCigar+str(chunkSize)+'M'
+							# spanning a deletion
+							if n[0] == 'D':
+								myCigar = myCigar+str(n[1])+'D'
+							# at least partially spanning the beginning of an insertion
+							elif n[0] == 'I':
+								chunkSize = min([nf-soFar,n[3]-soFar])
+								if chunkSize > 0:
+									myCigar = myCigar+str(chunkSize)+'I'
+									soFar += chunkSize
+						else:
+							# at least partially spanning the end of an insertion
+							if n[0] == 'I':
+								chunkSize = n[3]-soFar
+								# is this read fully inside of a large insertion?
+								if chunkSize >= READLEN:
+									myCigar = myCigar+str(rp-n[2])+'P'+str(READLEN)+'I'
+									soFar += READLEN
+									nir += chunkSize-n[1]
+									break
+
+								if chunkSize > 0:
+									myCigar = myCigar+str(chunkSize)+'I'
+									soFar += chunkSize
+									nir += chunkSize-n[1]
+
+					if soFar < nf:
+						myCigar = myCigar+str(nf-soFar)+'M'
+					cigarsAndAdjustedPos.extend([nir,myCigar])
+				#print cigarsAndAdjustedPos
+
+				if PAIRED_END:
+					[r1pos, cigar1, r2pos, cigar2] = cigarsAndAdjustedPos
+					r1NameSuffix = str(r1pos)+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/1'
+					r2NameSuffix = str(r2pos)+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/2'
+					r1Name = refName+'-'+r1NameSuffix
+					r2Name = refName+'-'+r2NameSuffix
 					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
+					OUTFQ2.write('@'+r2Name+'\n'+r2+'\n+\n'+q2+'\n')
+				else:
+					[r1pos, cigar1] = cigarsAndAdjustedPos
+					r1NameSuffix = str(r1pos)+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/1'
+					r1Name = refName+'-'+r1NameSuffix
+					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
+
+
+				if SAVE_VCF:
+					(r1i, r1f) = (r1posMyDat, r1posMyDat+READLEN)
+					if PAIRED_END:
+						(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
+
+					for sk in relevantSNP:
+						if (sk >= r1i and sk < r1f):
+							snpReads[sk].append(r1NameSuffix)
+							snpCoverage[sk] += 1
+						elif PAIRED_END and (sk >= r2i and sk < r2f):
+							snpReads[sk].append(r2NameSuffix)
+							snpCoverage[sk] += 1
+					for j in xrange(len(hitInds)):
+						indStart = hitInds[j][2]
+						if (indStart >= r1i and indStart < r1f):
+							indelCoverage[j+afwi/2] += 1
+							indelReads[j+afwi/2].append(r1NameSuffix)
+						elif PAIRED_END and (indStart >= r2i and indStart < r2f):
+							indelCoverage[j+afwi/2] += 1
+							indelReads[j+afwi/2].append(r2NameSuffix)
+
 
 				if SAVE_SAM:
 
-					cigarsAndAdjustedPos = []
 					if PAIRED_END:
-						rtt = [r1posMyDat,r2posMyDat]
-					else:
-						rtt = [r1posMyDat]
-					for rp in rtt:
-						# I want to get nucleotides 'ni' to 'nf' from our modified reference and get the
-						# corresponding bases from the original reference, as well as a cigar string that relates them
-						ni = rp
-						nf = rp+READLEN		# ni + READLEN
-
-						if len(relevantAT) == 0:
-							if len(indelList) > 0:
-								if afwi == len(addThis):
-									ni += addThis[-1]
-								else:
-									ni += addThis[afwi]
-							cigarsAndAdjustedPos.extend([ni,str(READLEN)+'M'])
-							continue
-
-						ptbi = bisect.bisect(relevantAT,ni)-1
-						#if ni in relevantAT:
-						#	ptbi -= 1
-						ptbf = bisect.bisect(relevantAT,nf)-1
-						if nf in relevantAT:
-							ptbf -= 1
-						ptbi += afwi
-						ptbf += afwi
-						nir = ni+addThis[ptbi]
-						nfr = nf+addThis[ptbf]
-
-						bpi = ptbi/2
-						bpf = min([ptbf/2,len(indelList)-1])
-						affectedBp = indelList[bpi:bpf]
-						# make sure we catch insertions near end of read
-						if indelList[bpf][2]+1 < nf:
-							affectedBp.append(indelList[bpf])
-
-						myCigar = ''
-						soFar = ni
-						for n in affectedBp:
-							chunkSize = n[2]-soFar+1
-							if chunkSize > 0:
-								soFar += chunkSize
-								myCigar = myCigar+str(chunkSize)+'M'
-								# spanning a deletion
-								if n[0] == 'D':
-									myCigar = myCigar+str(n[1])+'D'
-								# at least partially spanning the beginning of an insertion
-								elif n[0] == 'I':
-									chunkSize = min([nf-soFar,n[3]-soFar])
-									if chunkSize > 0:
-										myCigar = myCigar+str(chunkSize)+'I'
-										soFar += chunkSize
-							else:
-								# at least partially spanning the end of an insertion
-								if n[0] == 'I':
-									chunkSize = n[3]-soFar
-									# is this read fully inside of a large insertion?
-									if chunkSize >= READLEN:
-										myCigar = myCigar+str(rp-n[2])+'P'+str(READLEN)+'I'
-										soFar += READLEN
-										nir += chunkSize-n[1]
-										break
-
-									if chunkSize > 0:
-										myCigar = myCigar+str(chunkSize)+'I'
-										soFar += chunkSize
-										nir += chunkSize-n[1]
-
-						if soFar < nf:
-							myCigar = myCigar+str(nf-soFar)+'M'
-						cigarsAndAdjustedPos.extend([nir,myCigar])
-
-					#print cigarsAndAdjustedPos
-					if PAIRED_END:
-						[r1pos, cigar1, r2pos, cigar2] = cigarsAndAdjustedPos
 
 						samFlag1 = str(int('001100011',2))
 						pos1     = str(r1pos)	# position of first matching base
@@ -1417,7 +1429,6 @@ def main():
 						OUTSAM.write('\n')
 
 					else:
-						[r1pos, cigar1] = cigarsAndAdjustedPos
 
 						samFlag1 = str(int('001100000',2))
 						pos1     = str(r1pos)
