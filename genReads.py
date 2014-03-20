@@ -46,11 +46,10 @@ DEFAULT_RLN = 100				# default read-length
 DEFAULT_FLN = 250				# default mean fragment-length
 DEFAULT_FSD = 10				# default fragment-length std
 DEFAULT_WIN = 1000				# default sliding window size (for sampling reads / computing GC%)
-DEFAULT_NHL = 'OMIT'			# default N-handling
 DEFAULT_SER = 0.01				# default average sequencing error rate
 DEFAULT_VRA = 0.00034			# default average rate of variant occurences
 DEFAULT_MBD = 95				# default minimum bed-file region size to consider for targeted sequencing
-DEFAULT_BCV = 0.75				# default ratio of reads that we want to originate from targeted regions
+DEFAULT_BCV = 0					# default coverage in non-targeted regions
 DEFAULT_QSM = 'qScoreStuff.p'	# default quality-score model
 
 PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -o <out.prefix>',description=DESC,version="%prog v"+str(VERS))
@@ -59,11 +58,10 @@ PARSER.add_option('-p',    help='Generate paired-end reads [%default]',         
 PARSER.add_option('-b',    help='Input bed file containing regions to sample from',   dest='BED',     default=None,        action='store',      metavar='<targets.bed>')
 PARSER.add_option('-B',    help='Minimum bed file region length [%default]',          dest='MBD',     default=DEFAULT_MBD, action='store',      metavar='<int>')
 PARSER.add_option('-c',    help='Average coverage [%default]',                        dest='COV',     default=DEFAULT_COV, action='store',      metavar='<float>')
-PARSER.add_option('-C',    help='Ratio of reads to come from bed regions [%default]', dest='BCV',     default=DEFAULT_BCV, action='store',      metavar='<float>')
+PARSER.add_option('-C',    help='Avg coverage in non-targeted regions [%default]',    dest='BCV',     default=DEFAULT_BCV, action='store',      metavar='<float>')
 PARSER.add_option('-f',    help='Average fragment length [%default]',                 dest='FLEN',    default=DEFAULT_FLN, action='store',      metavar='<int>')
 PARSER.add_option('-F',    help='Fragment length std [%default]',                     dest='FSTD',    default=DEFAULT_FSD, action='store',      metavar='<int>')
 PARSER.add_option('-l',    help='Read length [%default]',                             dest='RLEN',    default=DEFAULT_RLN, action='store',      metavar='<int>')
-PARSER.add_option('-N',    help="'N' handling: RANDOM or OMIT. [%default]",           dest='NHAN',    default=DEFAULT_NHL, action='store',      metavar='<str>')
 PARSER.add_option('-o',    help='Output filename prefix',                             dest='OUT',                          action='store',      metavar='<out.prefix>')
 PARSER.add_option('-q',    help='Quality score model [%default]',                     dest='QSM',     default=DEFAULT_QSM, action='store',      metavar='<model.p>')
 PARSER.add_option('-r',    help='Reference fasta',                                    dest='REF',                          action='store',      metavar='<ref.fa>')
@@ -100,7 +98,6 @@ SAVE_SAM         = OPTS.BOOL_SA
 SAVE_VCF         = OPTS.BOOL_VC
 SAVE_RUNINFO     = OPTS.BOOL_RI
 SAVE_CORRECT_REF = OPTS.BOOL_FA
-HANDLE_N         = OPTS.NHAN
 
 NATURAL_SNPS       = not(OPTS.NO_SNP)
 NATURAL_INDELS     = not(OPTS.NO_IND)
@@ -277,9 +274,6 @@ if PAIRED_END:
 	if COV_WINDOW <= FRAGMENT_SIZE+3*FRAGMENT_STD:
 		print 'Error: Window size must be at least FRAGMENT_LEN + 3*FRAGMENT_STD'
 		exit(1)
-#else:
-#	print 'Error: Single-End reads not supported yet, sorry :('
-#	exit(1)
 
 if not os.path.isfile(REFERENCE):
 	print 'Error: Could not open reference file.'
@@ -295,8 +289,8 @@ else:
 		print 'Error: Average SSE rate must be between: ({0:.6f}, 1.0], or == 0'.format(maxPerror)
 		exit(1)
 
-if BED_COVERAGE <= 0. or BED_COVERAGE > 1.:
-	print 'Error: Targeted region coverage ratio must be between: (0,1]'
+if BED_COVERAGE < 0.:
+	print 'Error: Coverage in non-targeted regions must be non-negative.'
 	exit(1)
 
 
@@ -925,23 +919,9 @@ def main():
 		print '{0:.3f} (sec)\n'.format(time.time()-tt)
 
 
-		"""//////////////////////////////////////////////////
-		////////////   SOME READ PREPROCESSING   ////////////
-		//////////////////////////////////////////////////"""
-
-		# replace Ns with random nucleotides if desired
-		if HANDLE_N == 'RANDOM':
-			tt = time.time()
-			sys.stdout.write('replacing Ns with random nucleotides... ')
-			sys.stdout.flush()
-			for i in xrange(0,myLen,COV_WINDOW):
-				currentDat = myDat[i:i+COV_WINDOW]
-				if 'N' in currentDat or 'n' in currentDat:
-					for j in xrange(i,min([i+COV_WINDOW,myLen])):
-						if myDat[j] == ASCII_N or myDat[j] == ASCII_n:
-							myDat[j] = NUM_NUCL[int(random.random()*4)]
-			print '{0:.3f} (sec)\n'.format(time.time()-tt)
-
+		"""/////////////////////////////////////////////////////
+		////////////   SOME WINDOW PREPROCESSING   /////////////
+		/////////////////////////////////////////////////////"""
 
 		# initialize variant coverage dictionaries
 		snpKeys = sorted(snps.keys())
@@ -960,8 +940,9 @@ def main():
 		# construct regions to sample from (from input bed file, if present)
 		nBedTargetedBP = 0
 		targRegions    = []
+		targRegionsFl  = []
+		targetRegionsToSample = []
 		if INPUT_BED != None:
-			bedRegions = []
 			bedfile = open(INPUT_BED,'r')
 			for line in bedfile:
 				splt = line.split('\t')
@@ -971,6 +952,7 @@ def main():
 						continue
 					nBedTargetedBP += regionLen
 					targRegions.append((int(splt[1]),int(splt[2])))
+					targRegionsFl.extend(targRegions[-1])
 					origCoords  = ( max([int(splt[1])-MIN_SAMPLE_SIZE, 0]), min([int(splt[2])+MIN_SAMPLE_SIZE, originalLen-1]) )
 					myDatCoords = ( origCoords[0]-addThis[bisect.bisect(afterThis,origCoords[0])-1], origCoords[1]-addThis[bisect.bisect(afterThis,origCoords[1])-1] )
 					#print origCoords,'-->',myDatCoords
@@ -981,19 +963,33 @@ def main():
 					#
 					#
 					# detect redundant regions
-					for i in xrange(len(bedRegions)):
-						if myDatCoords[0] < bedRegions[i][1]:
-							if myDatCoords[1] <= bedRegions[i][1]:
+					for i in xrange(len(targetRegionsToSample)):
+						if myDatCoords[0] < targetRegionsToSample[i][1]:
+							if myDatCoords[1] <= targetRegionsToSample[i][1]:
 								addMe = 0
 								break
 							else:
-								bedRegions[i] = (bedRegions[i][0],myDatCoords[1])
+								targetRegionsToSample[i] = (targetRegionsToSample[i][0],myDatCoords[1])
 								addMe = 0
 								break
 					if addMe:
-						bedRegions.append(myDatCoords)
+						targetRegionsToSample.append(myDatCoords)
 			bedfile.close()
-			Niters = len(bedRegions)
+
+
+		# determine which variants were targeted
+		if INPUT_BED != None:
+			for i in xrange(len(indelList)):
+				origInd = indelList[i][2]+addThis[i*2]
+				if bisect.bisect(targRegionsFl,origInd)%2 == 1:
+					indelTargeted[i] = 1
+			for k in snps.keys():
+				spos    = snps[k][2]
+				si      = bisect.bisect(afterThis,spos)-1
+				origInd = spos+addThis[si]+1
+				if bisect.bisect(targRegionsFl,origInd)%2 == 1:
+					snpTargeted[k] = 1
+		del targRegionsFl
 
 
 		# compute GC % of each window
@@ -1002,60 +998,59 @@ def main():
 		else:
 			windowShift = COV_WINDOW-READLEN
 		gcp = []
+		slidingWindowAfter = 0	# at what index in targetRegionsToSample begin uniform sliding windows?
 		if INPUT_BED == None:
 			for i in xrange(0,myLen,windowShift):
 				(bi,bf) = (i,i+COV_WINDOW)
+				targetRegionsToSample.append((bi,bf))
 				gcp.append(float(myDat[bi:bf].count('C')+myDat[bi:bf].count('G'))/(bf-bi))
+
+			# account for weird effects around the final window
+			del targetRegionsToSample[-1]
+			del gcp[-1]
+			targetRegionsToSample[-1] = (targetRegionsToSample[-1][0],len(myDat))
+
 			targetCov = [RELATIVE_GC_COVERAGE_BIAS[int(100.*n)] for n in gcp]
 			alpha = (len(gcp)*AVG_COVERAGE)/sum(targetCov)
 			alpha *= float(windowShift)/COV_WINDOW # account for window overlap
-			targetCov = [alpha*n for n in targetCov]
+		  	targetCov = [alpha*n for n in targetCov]
 		else:
-			for i in xrange(len(bedRegions)):
-				(bi,bf) = bedRegions[i]
+			for i in xrange(len(targetRegionsToSample)):
+				(bi,bf) = targetRegionsToSample[i]
 				gcp.append(float(myDat[bi:bf].count('C')+myDat[bi:bf].count('G'))/(bf-bi))
 			targetCov = [RELATIVE_GC_COVERAGE_BIAS[int(100.*n)] for n in gcp]
 			if len(targetCov) > 0 and sum(targetCov) > 0:
-				alpha = (len(gcp)*AVG_COVERAGE)/sum(targetCov)
+				alpha = (len(gcp)*(AVG_COVERAGE-BED_COVERAGE))/sum(targetCov)
 				targetCov = [alpha*n for n in targetCov]
 
 			# so we got coverage in desired regions, let's add a little bit of the rest if desired
-			if BED_COVERAGE < 1.:
-				targetedBpp  = sum(targetCov)*nBedTargetedBP
-				remainderBpp = (1.-BED_COVERAGE)*targetedBpp
-				remainderCov = remainderBpp/(myLen-nBedTargetedBP)
+			if BED_COVERAGE > 0.:
+				slidingWindowAfter = len(gcp)
 				gcp = []
 				for i in xrange(0,myLen,windowShift):
 					(bi,bf) = (i,i+COV_WINDOW)
-					bedRegions.append((bi,bf))
+					targetRegionsToSample.append((bi,bf))
 					gcp.append(float(myDat[bi:bf].count('C')+myDat[bi:bf].count('G'))/(bf-bi))
+
+				del targetRegionsToSample[-1]
+				del gcp[-1]
+				targetRegionsToSample[-1] = (targetRegionsToSample[-1][0],len(myDat))
+
 				targetCovR = [RELATIVE_GC_COVERAGE_BIAS[int(100.*n)] for n in gcp]
-				alpha = (len(gcp)*remainderCov)/sum(targetCovR)
+				alpha = (len(gcp)*BED_COVERAGE)/sum(targetCovR)
 				alpha *= float(windowShift)/COV_WINDOW # account for window overlap
 				targetCovR = [alpha*n for n in targetCovR]
 				targetCov.extend(targetCovR)
 
 		# determine which windows contain Ns and enumerate their non-N regions
-		if INPUT_BED == None:
-			Niters = len(targetCov)
-		else:
-			Niters = len(bedRegions)
 
 		hasN = {}
-		for i in xrange(Niters):
+		for i in xrange(len(targetRegionsToSample)):
 
-			if INPUT_BED == None:
-				bi = i*windowShift
-				bf = i*windowShift+COV_WINDOW
-				if i == len(targetCov)-1:
-					continue
-				elif i == len(targetCov)-2:
-					bf = myLen
-			else:
-				(bi,bf) = bedRegions[i]
+			(bi,bf) = targetRegionsToSample[i]
 
 			currentDat = myDat[bi:bf]
-			if HANDLE_N == 'OMIT' and 'N' in currentDat:
+			if 'N' in currentDat:
 				if currentDat.count('N') != len(currentDat):
 					inNind   = 0
 					NonNregions = []
@@ -1075,10 +1070,13 @@ def main():
 		////////////       READ SIMULATION       ////////////
 		//////////////////////////////////////////////////"""
 
-		print 'simulating reads...'
+		if PAIRED_END:
+			print 'simulating paired-end reads...'
+		else:
+			print 'simulating single-end reads...'
 		
 		# pre-compute number of reads for each window for each job
-		jobIterators = [xrange(n,Niters,JOB_TOT) for n in xrange(JOB_TOT)]
+		jobIterators = [xrange(n,len(targetRegionsToSample),JOB_TOT) for n in xrange(JOB_TOT)]
 		jobOffsets   = [0]
 		myJobReadsToAdd = []
 		myJobRegions    = []
@@ -1087,17 +1085,19 @@ def main():
 			jobReadCount = 0
 			for j in n:
 
-				if INPUT_BED == None:
-					bi = j*windowShift
-					bf = j*windowShift+COV_WINDOW
-					if j == len(targetCov)-1:
-						if i == JOB_ID-1:
-							myJobReadsToAdd.append(0)
-						continue
-					elif j == len(targetCov)-2:
-						bf = myLen
-				else:
-					(bi,bf) = bedRegions[j]
+				#if INPUT_BED == None:
+				#	bi = j*windowShift
+				#	bf = j*windowShift+COV_WINDOW
+				#	if j == len(targetCov)-1:
+				#		if i == JOB_ID-1:
+				#			myJobReadsToAdd.append(0)
+				#		continue
+				#	elif j == len(targetCov)-2:
+				#		bf = myLen
+				#else:
+				#	(bi,bf) = targetRegionsToSample[j]
+
+				(bi,bf) = targetRegionsToSample[j]
 
 				currentLen = bf-bi
 				if myDat[bi:bf].count('N') == currentLen:
@@ -1108,7 +1108,7 @@ def main():
 				nextN = j+1 in hasN
 				regionsToSample = []
 				coverageMult    = []
-				if INPUT_BED == None:
+				if j >= slidingWindowAfter:
 					if j not in hasN:
 						if prevN:
 							# merge end of previous window
@@ -1181,7 +1181,7 @@ def main():
 			q2 = q1
 		nReads = 0
 		nSeqSubErr = 0
-		PRINT_EVERY_PERCENT = 10
+		PRINT_EVERY_PERCENT = 5
 		totalProgress       = PRINT_EVERY_PERCENT
 		for i in xrange(len(myJobRegions)):
 			#print (i+1),'/',len(myJobRegions)
@@ -1492,10 +1492,8 @@ def main():
 						SVsAccountedFor[svi] = 1
 
 						VarTargeted = ''
-						for tRegion in targRegions:
-							if Svv[0] <= tRegion[1] and Svv[0] >= tRegion[0]:
-								VarTargeted = ';TARGETED=1'
-								break
+						if i in indelTargeted:
+							VarTargeted = ';TARGETED=1'
 						VarReads = ''
 						if len(indelReads[i]) > 0:
 							VarReads = ';READS='+','.join(indelReads[i])
@@ -1534,10 +1532,8 @@ def main():
 						SVids[idT] += 1
 				else:
 					VarTargeted = ''
-					for tRegion in targRegions:
-						if origInd <= tRegion[1] and origInd >= tRegion[0]:
-							VarTargeted = ';TARGETED=1'
-							break
+					if i in indelTargeted:
+						VarTargeted = ';TARGETED=1'
 					VarReads = ''
 					if len(indelReads[i]) > 0:
 						VarReads = ';READS='+','.join(indelReads[i])
@@ -1559,10 +1555,8 @@ def main():
 					origInd = spos+addThis[si]+1
 
 					VarTargeted = ''
-					for tRegion in targRegions:
-						if origInd <= tRegion[1] and origInd >= tRegion[0]:
-							VarTargeted = ';TARGETED=1'
-							break
+					if k in snpTargeted:
+						VarTargeted = ';TARGETED=1'
 					VarReads = ''
 					if len(snpReads[k]) > 0:
 						VarReads = ';READS='+','.join(snpReads[k])
@@ -1590,8 +1584,10 @@ def main():
 			if INPUT_BED == None:
 				totalBPtargeted     += len(myDat)-myDat.count('N')
 			else:
-				for region in bedRegions:
-					totalBPtargeted += region[1]-region[0]
+				for i in xrange(len(targetRegionsToSample)):
+					if i < slidingWindowAfter:
+						region = targetRegionsToSample[i]
+						totalBPtargeted += region[1]-region[0]
 
 	finalTime = time.time()-startTime
 
@@ -1646,7 +1642,6 @@ def main():
 			rfOut.write('MeanFragLen:\t'+str(FRAGMENT_SIZE)+'\n')
 			rfOut.write('FragLen Std:\t'+str(FRAGMENT_STD)+'\n')
 		rfOut.write('Avg Coverage:\t'+str(AVG_COVERAGE)+'x\n')
-		rfOut.write('N Handling:\t\t'+HANDLE_N+'\n')
 		rfOut.write('Variant Freq:\t'+str(AVG_VAR_FREQ)+'\n')
 
 		if SEQUENCING_SNPS:
