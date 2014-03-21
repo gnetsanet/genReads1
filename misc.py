@@ -92,13 +92,28 @@ def printBasesNicely(bp):
 	if bp < 1000:
 		return str(bp)+' bp'
 	elif bp < 1000000:
-		return '{:.2f} kbp'.format(float(bp)/1000.)
+		return '{0:.2f} kbp'.format(float(bp)/1000.)
 	elif bp < 1000000000:
-		return '{:.2f} Mbp'.format(float(bp)/1000000.)
+		return '{0:.2f} Mbp'.format(float(bp)/1000000.)
 	elif bp < 1000000000000:
-		return '{:.2f} Gbp'.format(float(bp)/1000000000.)
+		return '{0:.2f} Gbp'.format(float(bp)/1000000000.)
 	elif bp < 1000000000000000:
-		return '{:.2f} Tbp'.format(float(bp)/1000000000000.)
+		return '{0:.2f} Tbp'.format(float(bp)/1000000000000.)
 	elif bp < 1000000000000000000:
-		return '{:.2f} Pbp'.format(float(bp)/1000000000000000.)
+		return '{0:.2f} Pbp'.format(float(bp)/1000000000000000.)
 	return str(bp)+' bp'
+
+def printSizeNicely(b):
+	if b < 1000:
+		return str(b)+' B'
+	elif b < 1000000:
+		return '{0:.2f} kB'.format(float(b)/1000.)
+	elif b < 1000000000:
+		return '{0:.2f} MB'.format(float(b)/1000000.)
+	elif b < 1000000000000:
+		return '{0:.2f} GB'.format(float(b)/1000000000.)
+	elif b < 1000000000000000:
+		return '{0:.2f} TB'.format(float(b)/1000000000000.)
+	elif b < 1000000000000000000:
+		return '{0:.2f} PB'.format(float(b)/1000000000000000.)
+	return str(b)+' B'

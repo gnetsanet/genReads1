@@ -508,6 +508,7 @@ def main():
 	sequencesSampledFrom = 0
 	totalBPtargeted      = 0
 	totalBedTargetedBP   = 0
+	readsFromThisJob     = 0
 	# for each sequence in reference fasta file...
 	for n_RI in ref_inds:
 		refName = n_RI[0]
@@ -1581,6 +1582,7 @@ def main():
 			totalSTVs            += nSVs
 			sequencesSampledFrom += 1
 			totalBedTargetedBP   += nBedTargetedBP
+			readsFromThisJob     += nReads
 			if INPUT_BED == None:
 				totalBPtargeted     += len(myDat)-myDat.count('N')
 			else:
@@ -1609,12 +1611,12 @@ def main():
 	if SAVE_RUNINFO:
 		rfOut = open(OUTFILE_NAME+'_runInfo.txt','w')
 
-		refSizeMB = float(os.path.getsize(REFERENCE))/1000/1000
-		fq1SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read1.fq'))/1000/1000/1000
+		refSize = float(os.path.getsize(REFERENCE))
+		fq1Size = float(os.path.getsize(OUTFILE_NAME+'_read1.fq'))
 		if PAIRED_END:
-			fq2SizeGB = float(os.path.getsize(OUTFILE_NAME+'_read2.fq'))/1000/1000/1000
+			fq2Size = float(os.path.getsize(OUTFILE_NAME+'_read2.fq'))
 
-		rfOut.write('Reference:\t\t'+REFERENCE+' ({0:.2f} MB)\n'.format(refSizeMB))
+		rfOut.write('Reference:\t\t'+REFERENCE+' ('+printSizeNicely(refSize)+')\n')
 		if INPUT_BED == None:
 			rfOut.write('# Sequences:\t'+str(len(ref_inds))+' ('+printBasesNicely(totalBPtargeted)+' in total)\n')
 		else:
@@ -1623,25 +1625,28 @@ def main():
 		rfOut.write('Command:\t\t'+' '.join(sys.argv)+'\n')
 
 		rfOut.write('\n\n********* FILES GENERATED *********\n\n')
-		rfOut.write('Read files:\t\t'+OUTFILE_NAME+'_read1.fq ({0:.2f} GB)\n\t\t\t\t'.format(fq1SizeGB))
+		rfOut.write('Read files:\t\t'+OUTFILE_NAME+'_read1.fq ('+printSizeNicely(fq1Size)+')\n\t\t\t\t')
 		if PAIRED_END:
-			rfOut.write(OUTFILE_NAME+'_read2.fq ({:.2f} GB)\n'.format(fq2SizeGB))
+			rfOut.write(OUTFILE_NAME+'_read2.fq ('+printSizeNicely(fq2Size)+')\n')
 		if SAVE_CORRECT_REF:
-			crSizeMB = float(os.path.getsize(OUTFILE_NAME+'_correctRef.fa'))/1000/1000
-			rfOut.write('\nRef + Variants:\t'+OUTFILE_NAME+'_correctRef.fa ({0:.2f} MB)\n'.format(crSizeMB))
+			crSize = float(os.path.getsize(OUTFILE_NAME+'_correctRef.fa'))
+			rfOut.write('\nRef + Variants:\t'+OUTFILE_NAME+'_correctRef.fa ('+printSizeNicely(crSize)+')\n')
 		if SAVE_SAM:
-			samSizeGB = float(os.path.getsize(OUTFILE_NAME+'_golden.sam'))/1000/1000/1000
-			rfOut.write('\nGolden SAM:\t\t'+OUTFILE_NAME+'_golden.sam ({0:.2f} GB)\n'.format(samSizeGB))
+			samSize = float(os.path.getsize(OUTFILE_NAME+'_golden.sam'))
+			rfOut.write('\nGolden SAM:\t\t'+OUTFILE_NAME+'_golden.sam ('+printSizeNicely(samSize)+')\n')
 		if SAVE_VCF:
-			vcfSizeMB = float(os.path.getsize(OUTFILE_NAME+'_golden.vcf'))/1000/1000
-			rfOut.write('\nGolden VCF:\t\t'+OUTFILE_NAME+'_golden.vcf ({0:.2f} MB)\n'.format(vcfSizeMB))
+			vcfSize = float(os.path.getsize(OUTFILE_NAME+'_golden.vcf'))
+			rfOut.write('\nGolden VCF:\t\t'+OUTFILE_NAME+'_golden.vcf ('+printSizeNicely(vcfSize)+')\n')
 
 		rfOut.write('\n\n********* PARAMETERS *********\n\n')
 		rfOut.write('ReadLen:\t\t'+str(READLEN)+'\n')
 		if PAIRED_END:
 			rfOut.write('MeanFragLen:\t'+str(FRAGMENT_SIZE)+'\n')
 			rfOut.write('FragLen Std:\t'+str(FRAGMENT_STD)+'\n')
-		rfOut.write('Avg Coverage:\t'+str(AVG_COVERAGE)+'x\n')
+		if INPUT_BED == None:
+			rfOut.write('Avg Coverage:\t'+str(AVG_COVERAGE)+'x\n')
+		else:
+			rfOut.write('Avg Coverage:\t'+str(AVG_COVERAGE)+'x in targeted regions, '+str(BED_COVERAGE)+'x elsewhere\n')
 		rfOut.write('Variant Freq:\t'+str(AVG_VAR_FREQ)+'\n')
 
 		if SEQUENCING_SNPS:
@@ -1665,9 +1670,14 @@ def main():
 		rfOut.write('RNG_SEED:\t\t'+str(RNG_SEED)+'\n')
 
 		rfOut.write('\n\n********* STATS *********\n\n')
-		rfOut.write('Total Reads:\t'+str(bigReadNameOffset)+' ('+printBasesNicely(bigReadNameOffset*READLEN)+')\n')
-		rfOut.write('Total Runtime:\t'+str(int(finalTime))+' sec\n')
-		rfOut.write('Rate:\t\t\t'+printBasesNicely(int(float(bigReadNameOffset*READLEN)/finalTime+0.5))+'/sec\n\n')
+		if MULTI_JOB:
+			rfOut.write('Total Reads:\n')
+			rfOut.write('\t- This Job:\t\t\t'+str(readsFromThisJob)+' ('+printBasesNicely(readsFromThisJob*READLEN)+')\n')
+			rfOut.write('\t- Among All Jobs:\t'+str(bigReadNameOffset)+' ('+printBasesNicely(bigReadNameOffset*READLEN)+')\n\n')
+		else:
+			rfOut.write('Total Reads:\t'+str(bigReadNameOffset)+' ('+printBasesNicely(bigReadNameOffset*READLEN)+')\n')
+		rfOut.write('Total Runtime:\t'+str(int(finalTime))+' sec\n\n')
+		#rfOut.write('Rate:\t\t\t'+printBasesNicely(int(float(bigReadNameOffset*READLEN)/finalTime+0.5))+'/sec\n\n')
 		rfOut.write('Variants Introduced:\n')
 		rfOut.write('\t- '+str(totalSNPs)+' SNPs\n')
 		rfOut.write('\t- '+str(totalInds)+' small indels (length 1-'+str(MAX_INDEL)+')\n')
