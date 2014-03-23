@@ -1360,8 +1360,8 @@ def main():
 
 				if PAIRED_END:
 					[r1pos, cigar1, r2pos, cigar2] = cigarsAndAdjustedPos
-					r1NameSuffix = str(r1pos)+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/1'
-					r2NameSuffix = str(r2pos)+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/2'
+					r1NameSuffix = str(r1pos)+'-'+str(r2pos)+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/1'
+					r2NameSuffix = str(r1pos)+'-'+str(r2pos)+'-'+str(nReads+myJobOffset+bigReadNameOffset)+'/2'
 					r1Name = refName+'-'+r1NameSuffix
 					r2Name = refName+'-'+r2NameSuffix
 					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
