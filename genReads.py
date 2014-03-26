@@ -40,17 +40,18 @@ from misc	import *
 DESC   = """%prog: Variant and read simulator for benchmarking NGS workflows."""
 VERS   = 0.1
 
-DEFAULT_COV = 10.				# default average coverage value
-DEFAULT_RNG = None				# default RNG seed
-DEFAULT_RLN = 100				# default read-length
-DEFAULT_FLN = 250				# default mean fragment-length
-DEFAULT_FSD = 10				# default fragment-length std
-DEFAULT_WIN = 1000				# default sliding window size (for sampling reads / computing GC%)
-DEFAULT_SER = 0.01				# default average sequencing error rate
-DEFAULT_VRA = 0.00034			# default average rate of variant occurences
-DEFAULT_MBD = 95				# default minimum bed-file region size to consider for targeted sequencing
-DEFAULT_BCV = 0					# default coverage in non-targeted regions
-DEFAULT_QSM = 'qScoreStuff.p'	# default quality-score model
+DEFAULT_COV = 10.							# default average coverage value
+DEFAULT_RNG = None							# default RNG seed
+DEFAULT_RLN = 100							# default read-length
+DEFAULT_FLN = 250							# default mean fragment-length
+DEFAULT_FSD = 10							# default fragment-length std
+DEFAULT_WIN = 1000							# default sliding window size (for sampling reads / computing GC%)
+DEFAULT_SER = 0.01							# default average sequencing error rate
+DEFAULT_VRA = 0.00034						# default average rate of variant occurences
+DEFAULT_MBD = 95							# default minimum bed-file region size to consider for targeted sequencing
+DEFAULT_BCV = 0								# default coverage in non-targeted regions
+DEFAULT_QSM = 'models/qModel_AlvaroPhix.p'	# default quality-score model
+DEFAULT_SSM = 'models/SSE_model1_pIRS.p'	# default sequencing-substituion-error model
 
 PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -o <out.prefix>',description=DESC,version="%prog v"+str(VERS))
 
@@ -66,7 +67,8 @@ PARSER.add_option('-o',    help='Output filename prefix',                       
 PARSER.add_option('-q',    help='Quality score model [%default]',                     dest='QSM',     default=DEFAULT_QSM, action='store',      metavar='<model.p>')
 PARSER.add_option('-r',    help='Reference fasta',                                    dest='REF',                          action='store',      metavar='<ref.fa>')
 PARSER.add_option('-R',    help='RNG seed value [%default]',                          dest='RNG',     default=DEFAULT_RNG, action='store',      metavar='<int>')
-PARSER.add_option('-s',    help='Average sequencing error rate [%default]',           dest='SER',     default=DEFAULT_SER, action='store',      metavar='<float>')
+PARSER.add_option('-s',    help='SSE model [%default]',                               dest='SSM',     default=DEFAULT_SSM, action='store',      metavar='<model.p>')
+PARSER.add_option('-S',    help='Average sequencing error rate [%default]',           dest='SER',     default=DEFAULT_SER, action='store',      metavar='<float>')
 PARSER.add_option('-v',    help='Input VCF file',                                     dest='VCF',     default=None,        action='store',      metavar='<str>')
 PARSER.add_option('-V',    help='Average variant occurence rate [%default]',          dest='VRA',     default=DEFAULT_VRA, action='store',      metavar='<float>')
 PARSER.add_option('-w',    help='Window size for computing GC% [%default]',           dest='WIN',     default=DEFAULT_WIN, action='store',      metavar='<int>')
@@ -211,16 +213,21 @@ SNP_MUT    = [[0.,   0.15,  0.70,  0.15],
 ///////////////////////////////////////////////////"""
 
 # how are the nucleotides misrepresented if a sub sequencing error occurs?
-SEQ_ERR    = [[0.,     0.4918, 0.3377, 0.1705 ],
-			  [0.5238,     0., 0.2661, 0.2101 ],
-			  [0.3754, 0.2355,     0., 0.3890 ],
-			  [0.2505, 0.2552, 0.4942, 0.     ]]
+#SEQ_ERR    = [[0.,     0.4918, 0.3377, 0.1705 ],
+#			  [0.5238,     0., 0.2661, 0.2101 ],
+#			  [0.3754, 0.2355,     0., 0.3890 ],
+#			  [0.2505, 0.2552, 0.4942, 0.     ]]
 
 # probability of sequencing insertion errors (length 1,2,3..)
-SEQ_INS    = [0., 0., 0.]
+#SEQ_INS    = [0., 0., 0.]
 
 # probability of sequencing deletion errors (length 1,2,3..)
-SEQ_DEL    = [0., 0., 0.]
+#SEQ_DEL    = [0., 0., 0.]
+
+if OPTS.SSM == DEFAULT_SSM:
+	SSE_MODEL = SIM_PATH+DEFAULT_SSM
+else:
+	SSE_MODEL = OPTS.SSM
 
 
 """////////////////////////////////////////////////
@@ -293,6 +300,10 @@ if BED_COVERAGE < 0.:
 	print 'Error: Coverage in non-targeted regions must be non-negative.'
 	exit(1)
 
+if not os.path.isfile(SSE_MODEL):
+	print 'Error: Could not open SSE model.'
+	exit(1)
+
 
 """////////////////////////////////////////////////
 ////////////           MAIN()          ////////////
@@ -318,6 +329,7 @@ def main():
 	#print cpSNP
 
 	# create cumulative probability lists for substitution sequencing errors
+	[SEQ_ERR] = pickle.load(open(SSE_MODEL,'rb'))
 	cpSSE = copy.deepcopy(SEQ_ERR)
 	for i in range(len(cpSSE)):
 		cpSSE[i] = [0]+cpSSE[i][:-1]
