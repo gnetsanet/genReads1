@@ -314,6 +314,9 @@ def main():
 	startTime = time.time()
 	startDate = time.asctime()
 
+	if RNG_SEED != None:
+		random.seed(RNG_SEED)
+
 	# create cumulative probability list for indel lengths
 	cpIndel = [0.]+[n/INDEL_FREQ for n in INDEL_MUT][:-1]
 	for i in range(1,len(INDEL_MUT)):
@@ -952,7 +955,7 @@ def main():
 
 		# construct regions to sample from (from input bed file, if present)
 		nBedTargetedBP = 0
-		targRegions    = []
+		#targRegions    = []
 		targRegionsFl  = []
 		targetRegionsToSample = []
 		if INPUT_BED != None:
@@ -964,7 +967,7 @@ def main():
 					if regionLen < MIN_PROBE_LEN:
 						continue
 					nBedTargetedBP += regionLen
-					targRegions.append((int(splt[1]),int(splt[2])))
+					#targRegions.append((int(splt[1]),int(splt[2])))
 					targRegionsFl.extend(targRegions[-1])
 					origCoords  = ( max([int(splt[1])-MIN_SAMPLE_SIZE, 0]), min([int(splt[2])+MIN_SAMPLE_SIZE, originalLen-1]) )
 					myDatCoords = ( origCoords[0]-addThis[bisect.bisect(afterThis,origCoords[0])-1], origCoords[1]-addThis[bisect.bisect(afterThis,origCoords[1])-1] )

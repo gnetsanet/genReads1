@@ -117,3 +117,71 @@ def printSizeNicely(b):
 	elif b < 1000000000000000000:
 		return '{0:.2f} PB'.format(float(b)/1000000000000000.)
 	return str(b)+' B'
+
+def needleman_wunsch(mismatch, gap, sequence1, sequence2):
+	"""
+	Calculate the minimum penalty alignment.
+	"""
+
+	# Get lengths of strings.
+	n = len(sequence1)
+	m = len(sequence2)
+
+	# Make two-dimensional list for subproblem solutions.
+	subproblems = [[0 for x in range(m+1)] for x in range(n+1)]
+
+	# Fill in zeros on both dimensions with gap penalties.
+	for i in range(n+1):
+		subproblems[i][0] = i * gap
+
+	for j in range(m+1):
+		subproblems[0][j] = j * gap
+
+	# Calculate subproblem solutions.
+	for i in range(1, n+1):
+		for j in range(1, m+1):
+			case1 = subproblems[i-1][j-1]
+
+			if sequence1[i-1] != sequence2[j-1]:
+				case1 += mismatch
+
+			case2 = subproblems[i-1][j] + gap
+			case3 = subproblems[i][j-1] + gap
+
+			subproblems[i][j] = min([case1, case2, case3])
+
+	penalty = subproblems[n][m]
+
+	# Backtrace to reconstruct optimal alignment.
+	alignment1 = ""
+	alignment2 = ""
+
+	i = n
+	j = m
+	while i > 0 or j > 0:
+		pos = subproblems[i][j]
+		case1_match = subproblems[i-1][j-1]
+		case1_mismatch = case1_match + mismatch
+		case2 = subproblems[i-1][j] + gap
+		case3 = subproblems[i][j-1] + gap
+
+		if i > 0 and pos == case1_match:
+			alignment1 = sequence1[i-1] + alignment1
+			alignment2 = sequence2[j-1] + alignment2
+			i -= 1
+			j -= 1
+		elif i > 0 and pos == case1_mismatch:
+			alignment1 = sequence1[i-1] + alignment1
+			alignment2 = sequence2[j-1] + alignment2
+			i -= 1
+			j -= 1
+		elif i > 0 and pos == case2:
+			alignment1 = sequence1[i-1] + alignment1
+			alignment2 = '-' + alignment2
+			i -= 1
+		elif j > 0 and pos == case3:
+			alignment1 = '-' + alignment1
+			alignment2 = sequence2[j-1] + alignment2
+			j -= 1
+
+	return (penalty, alignment1, alignment2)

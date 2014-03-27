@@ -29,7 +29,7 @@ import copy
 import subprocess
 import cPickle as pickle
 
-PLOT_STUFF = 0
+PLOT_STUFF = 1
 
 if PLOT_STUFF:
 	import matplotlib.pyplot as mpl
