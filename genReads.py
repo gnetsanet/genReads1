@@ -955,7 +955,6 @@ def main():
 
 		# construct regions to sample from (from input bed file, if present)
 		nBedTargetedBP = 0
-		#targRegions    = []
 		targRegionsFl  = []
 		targetRegionsToSample = []
 		if INPUT_BED != None:
@@ -967,8 +966,7 @@ def main():
 					if regionLen < MIN_PROBE_LEN:
 						continue
 					nBedTargetedBP += regionLen
-					#targRegions.append((int(splt[1]),int(splt[2])))
-					targRegionsFl.extend(targRegions[-1])
+					targRegionsFl.extend((int(splt[1]),int(splt[2])))
 					origCoords  = ( max([int(splt[1])-MIN_SAMPLE_SIZE, 0]), min([int(splt[2])+MIN_SAMPLE_SIZE, originalLen-1]) )
 					myDatCoords = ( origCoords[0]-addThis[bisect.bisect(afterThis,origCoords[0])-1], origCoords[1]-addThis[bisect.bisect(afterThis,origCoords[1])-1] )
 					#print origCoords,'-->',myDatCoords
