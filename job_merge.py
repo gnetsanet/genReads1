@@ -40,14 +40,14 @@ def main():
 	print 'merging files...'
 
 	of = open(dn+'_read1.fq','wb')
-	for fn in fq1List:
+	for fn in sorted(fq1List):
 		f = open(fn,'r')
 		writeInChunks(of,f)
 		f.close()
 	of.close()
 
 	of = open(dn+'_read2.fq','wb')
-	for fn in fq2List:
+	for fn in sorted(fq2List):
 		f = open(fn,'r')
 		writeInChunks(of,f)
 		f.close()
@@ -55,7 +55,7 @@ def main():
 
 	if len(samList) > 0:
 		of = open(dn+'_golden.sam','wb')
-	for fn in samList:
+	for fn in sorted(samList):
 		f = open(fn,'r')
 		if fn == samList[0]:
 			writeInChunks(of,f)
@@ -74,7 +74,7 @@ def main():
 		of.close()
 
 	variantInf = {}
-	for fn in vcfList:
+	for fn in sorted(vcfList):
 		f = open(fn,'r')
 		fch = ''
 		fchPrev = ''
