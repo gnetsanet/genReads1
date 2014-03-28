@@ -22,11 +22,13 @@ import glob
 
 BUFFER_SIZE = 512000000
 
+
 def writeInChunks(of,f):
 	outData = f.read(BUFFER_SIZE)
 	while outData != '':
 		of.write(outData)
 		outData = f.read(BUFFER_SIZE)
+
 
 def main():
 	dn = sys.argv[1]
