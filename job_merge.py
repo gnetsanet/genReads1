@@ -31,23 +31,23 @@ def writeInChunks(of,f):
 def main():
 	dn = sys.argv[1]
 
-	fq1List = glob.glob(dn+'_job*read1.fq')
-	fq2List = glob.glob(dn+'_job*read2.fq')
-	samList = glob.glob(dn+'_job*.sam')
-	vcfList = glob.glob(dn+'_job*.vcf')
+	fq1List = sorted(glob.glob(dn+'_job*read1.fq'))
+	fq2List = sorted(glob.glob(dn+'_job*read2.fq'))
+	samList = sorted(glob.glob(dn+'_job*.sam'))
+	vcfList = sorted(glob.glob(dn+'_job*.vcf'))
 
 	tt = time.time()
 	print 'merging files...'
 
 	of = open(dn+'_read1.fq','wb')
-	for fn in sorted(fq1List):
+	for fn in fq1List:
 		f = open(fn,'r')
 		writeInChunks(of,f)
 		f.close()
 	of.close()
 
 	of = open(dn+'_read2.fq','wb')
-	for fn in sorted(fq2List):
+	for fn in fq2List:
 		f = open(fn,'r')
 		writeInChunks(of,f)
 		f.close()
@@ -55,7 +55,7 @@ def main():
 
 	if len(samList) > 0:
 		of = open(dn+'_golden.sam','wb')
-	for fn in sorted(samList):
+	for fn in samList:
 		f = open(fn,'r')
 		if fn == samList[0]:
 			writeInChunks(of,f)
@@ -74,7 +74,7 @@ def main():
 		of.close()
 
 	variantInf = {}
-	for fn in sorted(vcfList):
+	for fn in vcfList:
 		f = open(fn,'r')
 		fch = ''
 		fchPrev = ''
