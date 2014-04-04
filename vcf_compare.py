@@ -238,22 +238,22 @@ def main():
 	potential_pairs = []
 	delList_i = []
 	delList_j = []
-	for i in xrange(len(FPvariants)):
-		pos = FPvariants[i][0][0]
-		roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
-		refSection1 = myDat[roi[0]:roi[1]]
-
-		for j in xrange(len(notFound)):
-			if (FPvariants[i][0][1],FPvariants[i][0][2]) == (notFound[j][1],notFound[j][2]):
-				pos = notFound[j][0]
-				roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
-				refSection2 = myDat[roi[0]:roi[1]]
-
-				(score,a1,a2) = needleman_wunsch(1, 1, str(refSection1), str(refSection2))
-				if score <= RR_THRESH:
-					potential_pairs.append((i,j,score))
-					delList_i.append(i)
-					delList_j.append(j)
+	#for i in xrange(len(FPvariants)):
+	#	pos = FPvariants[i][0][0]
+	#	roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
+	#	refSection1 = myDat[roi[0]:roi[1]]
+	#
+	#	for j in xrange(len(notFound)):
+	#		if (FPvariants[i][0][1],FPvariants[i][0][2]) == (notFound[j][1],notFound[j][2]):
+	#			pos = notFound[j][0]
+	#			roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
+	#			refSection2 = myDat[roi[0]:roi[1]]
+	#
+	#			(score,a1,a2) = needleman_wunsch(1, 1, str(refSection1), str(refSection2))
+	#			if score <= RR_THRESH:
+	#				potential_pairs.append((i,j,score))
+	#				delList_i.append(i)
+	#				delList_j.append(j)
 
 	print 'Pairs of variants that originated from within one instance of a repetitive region, but were called by the workflow in another because the reads from the original region were confidently mapped elsewhere:',len(potential_pairs),'\n'
 	for n in potential_pairs:
