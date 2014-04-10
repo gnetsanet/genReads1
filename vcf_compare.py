@@ -75,7 +75,10 @@ def main():
 		print 'reading '+refName+'...',
 		myDat  = f.read(n_RI[2]-n_RI[1]).split('\n')
 		myLen  = sum([len(m) for m in myDat])
-		print '{:,} bp\n'.format(myLen)
+		if sys.version_info >= (2,7):
+			print '{:,} bp\n'.format(myLen)
+		else:
+			print '{0:} bp\n'.format(myLen)
 		inWidth = len(myDat[0])
 		if len(myDat[-1]) == 0:	# if last line is empty, remove it.
 			del myDat[-1]
@@ -225,9 +228,9 @@ def main():
 	if BEDFILE != None:
 		print 'ONLY CONSIDERING VARIANTS FOUND WITHIN TARGETED REGIONS\n\n'
 	print 'Total Golden Variants:',totalVariants,'\n'
-	print 'Perfect Matches:',nPerfect,'({:.2f}%)'.format(100.*float(nPerfect)/totalVariants)
-	print 'FP variants:   ',len(FPvariants),'({:.2f}%)'.format(100.*float(len(FPvariants))/totalVariants)
-	print 'FN variants:   ',len(notFound),'({:.2f}%)'.format(100.*float(len(notFound))/totalVariants)
+	print 'Perfect Matches:',nPerfect,'({0:.2f}%)'.format(100.*float(nPerfect)/totalVariants)
+	print 'FP variants:   ',len(FPvariants),'({0:.2f}%)'.format(100.*float(len(FPvariants))/totalVariants)
+	print 'FN variants:   ',len(notFound),'({0:.2f}%)'.format(100.*float(len(notFound))/totalVariants)
 	print '\nNumber of equivalent variants denoted differently between the two vcfs:',nEquiv
 	if BEDFILE != None:
 		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',nBelowMinRLen
