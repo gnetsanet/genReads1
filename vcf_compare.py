@@ -36,6 +36,8 @@ RR_BPRANGE = 70		# how far to either side of a particular variant location do we
 
 RR_THRESH  = RR_BPRANGE/4
 
+DEFAULT_QUAL = -666
+
 def main():
 
 	if len(sys.argv) != 5 and len(sys.argv) != 7:
@@ -146,7 +148,10 @@ def main():
 			if targInd%2 == 1:
 				targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
 				if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
-					qual = float(splt[5])
+					if splt[5] == '.':
+						qual = DEFAULT_QUAL
+					else:
+						qual = float(splt[5])
 					cov  = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
 					workflowVariants.append([var,[qual,cov,targLen]])
 

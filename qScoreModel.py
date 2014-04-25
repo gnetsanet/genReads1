@@ -34,7 +34,7 @@ PLOT_STUFF = 1
 if PLOT_STUFF:
 	import matplotlib.pyplot as mpl
 
-MAX_READLEN = 250
+MAX_READLEN = 1000
 MAX_READS   = 10000000
 
 INIT_SMOOTH = 1000.
@@ -51,14 +51,14 @@ def main():
 	offQ = int(sys.argv[3])
 	outM = sys.argv[4]
 
-	print 'opening file / counting reads...'
+	print 'opening file...'
 	f = open(infq,'r')
-	nReads = int(subprocess.check_output("wc -l "+infq, shell=True).split(' ')[1])/4
 
-	print 'generating q-score transition matrix... (using '+str(min([MAX_READS,nReads]))+'/'+str(nReads)+' reads)'
+	#nReads = int(subprocess.check_output("wc -l "+infq, shell=True).split(' ')[1])/4
+	#print 'generating q-score transition matrix... (using '+str(min([MAX_READS,nReads]))+'/'+str(nReads)+' reads)'
+
 	totalQ = np.ones([RQ,RQ])
 	rRead  = 0
-	priorQ = np.ones([MAX_READLEN,RQ])
 	actual_readlen = 0
 	while True:
 		data1 = f.readline()
@@ -69,7 +69,10 @@ def main():
 			break
 
 		qscore = [ord(n)-offQ for n in data4[:-1]]
-		actual_readlen = len(qscore)
+		if actual_readlen == 0:
+			actual_readlen = len(qscore)
+			priorQ = np.ones([actual_readlen,RQ])
+
 		for i in range(len(qscore)):
 			if i == 0:
 				priorQ[i][qscore[i]] += 1
@@ -91,8 +94,8 @@ def main():
 		for j in xrange(RQ):
 			probQ[i][j] = totalQ[i][j]/rowSum
 
-	initQ  = [[INIT_SMOOTH for m in xrange(RQ)] for n in xrange(MAX_READLEN)]
-	for i in xrange(MAX_READLEN):
+	initQ  = [[INIT_SMOOTH for m in xrange(RQ)] for n in xrange(actual_readlen)]
+	for i in xrange(actual_readlen):
 		rowSum = float(np.sum(priorQ[i,:]))+INIT_SMOOTH*RQ
 		for j in xrange(RQ):
 			initQ[i][j] = (priorQ[i][j]+INIT_SMOOTH)/rowSum

@@ -34,6 +34,37 @@ def randEvent(cumP):
 	r = random.random()
 	return bisect.bisect(cumP,r)-1
 
+#def generateAliasTable(pList):
+#	n = len(pList)
+#	p = [n*m for m in pList]
+#	prob  = [-1.]*n
+#	alias = [-1]*n
+#	nope  = []
+#	for j in xrange(1,n):
+#		for l in xrange(n):
+#			if p[l] <= 1. and l not in nope:
+#				pl = p[l]
+#				break
+#		for g in xrange(n):
+#			if p[g] >= 1. and g != l:
+#				pg = p[g]
+#				break
+#		prob[l]  = pl
+#		alias[l] = g
+#		nope.append(l)
+#		p[g] -= (1-pl)
+#	prob[-1] = 1.
+#	print prob, alias
+#
+#	return (alias,prob)
+#
+#def randEventAlias(alias,prob):
+#	r = random.randint(0,len(prob)-1)
+#	if random.random() < prob[r]:
+#		return r
+#	else:
+#		return alias[r]
+
 # slow, don't use me
 def randEvent_old(cumP):
 	r = random.random()

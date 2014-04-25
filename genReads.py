@@ -281,6 +281,9 @@ if PAIRED_END:
 	if COV_WINDOW <= FRAGMENT_SIZE+3*FRAGMENT_STD:
 		print 'Error: Window size must be at least FRAGMENT_LEN + 3*FRAGMENT_STD'
 		exit(1)
+else:
+	if READLEN >= COV_WINDOW:
+		print 'Error: Window size must be at least READLEN'
 
 if not os.path.isfile(REFERENCE):
 	print 'Error: Could not open reference file.'
@@ -342,6 +345,24 @@ def main():
 
 	# load empirical quality score distributions
 	[allPMFs,probQ,Qscores,qOffset] = pickle.load(open(QSCORE_MODEL,'rb'))
+	if len(allPMFs)-1 < READLEN:
+		# we need to extend our qscore model to facilitate longer reads
+		nToAdd = READLEN - len(allPMFs) + 1
+		nAdded = 0
+		while True:
+			#print len(allPMFs)
+			adj = 0
+			for i in xrange(1,len(allPMFs)-1):
+				toIns = [(allPMFs[i+adj][j]+allPMFs[i+adj+1][j])/2. for j in xrange(len(allPMFs[0]))]
+				toIns = [n/sum(toIns) for n in toIns]
+				allPMFs.insert(i+adj,copy.deepcopy(toIns))
+				nAdded += 1
+				adj += 1
+				if nAdded == nToAdd:
+					break
+			if nAdded == nToAdd:
+				break
+
 	if SEQUENCING_QSCORES:
 		learnedCycles = len(allPMFs)
 		nQscores = len(allPMFs[0])
@@ -374,6 +395,7 @@ def main():
 			for i in xrange(learnedCycles):		# for each cycle 'i'...
 				for j in xrange(nQscores):		# for each previous qscore 'j'...
 					prod = [allPMFs[i][k]*probQ[j][k] for k in xrange(nQscores)]
+					#prod = [1.*probQ[j][k] for k in xrange(nQscores)]
 					if qScoreShift > 0:
 						for k in xrange(qScoreShift):
 							del prod[-1]
@@ -394,7 +416,7 @@ def main():
 				pError[ind] = 10.**(-i/10.)
 			# scale error rates such that the average SSE rate is as desired
 			# this is done by sampling a number of reads and estimating the current average rate
-			sseScaleSample = 50000
+			sseScaleSample = 2000000/READLEN
 			avgError = []
 			for i in xrange(sseScaleSample):
 				q1 = bytearray()
@@ -417,27 +439,6 @@ def main():
 			pprevShift = prevShift
 			prevShift  = qScoreShift
 
-		# let's adjust the scores on the higher end of the spectrum a bit more
-		#plusMinusQAdj = 0.0
-		#qScoreAdjustments = np.linspace((1-plusMinusQAdj)*sseScalar,(1+plusMinusQAdj)*sseScalar,READLEN).tolist()
-		#for i in xrange(nQscores):
-		#	k = i+qOffset
-		#	comingFrom = [pError[k], int(-10.*np.log10(pError[k]))]
-		#	goingTo    = [qScoreAdjustments[i]*pError[k], int(-10.*np.log10(qScoreAdjustments[i]*pError[k]))]
-		#	if goingTo[0] > 1.0:
-		#		goingTo[0] = 1.0
-		#	if goingTo[1] > nQscores:
-		#		goingTo[1] = nQscores
-		#	elif goingTo[1] < 0:
-		#		goingTo[1] = 0
-		#	print k, comingFrom[0], '-->', goingTo[0], ':', comingFrom[1], '-->', goingTo[1]
-		#	pError[k] = goingTo[0]
-
-		#for k in sorted(pError.keys()):
-		#	comingFrom = (pError[k], int(-10.*np.log10(pError[k])))
-		#	goingTo    = (min([sseScalar*pError[k],1.0]), max([int(-10.*np.log10(sseScalar*pError[k])),0]))
-		#	print k, comingFrom[0], '-->', goingTo[0], ':', comingFrom[1], '-->', goingTo[1]
-		#	pError[k] = sseScalar*pError[k]
 	else:
 		plusMinusSSE = 0.5
 		positionSSErate = np.linspace((1-plusMinusSSE)*AVG_SSE,(1+plusMinusSSE)*AVG_SSE,READLEN).tolist()
