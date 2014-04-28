@@ -108,14 +108,19 @@ def main():
 		if 'TARGETED=1' in soi:
 			targeted = 'TARGETED=1;'
 
-		readsCov = 'READS=' + ','.join([m[6:] for m in re.findall(r"(READS=.*?)(?=;)",soi)])
+		rstrs = [m[6:] for m in re.findall(r"(READS=.*?)(?=;)",soi)]
+		if rstrs == ['']:
+			readsCov == ''
+		else:
+			readsCov = 'READS=' + ','.join(rstrs)
 
 		variantInf[n] = coverage+';'+targeted+readsCov
 
 	if len(vcfList) > 0:
-		allVariants = [(n[0],n[1],n[2],n[3],n[4],n[5],n[6],variantInf[n]) for n in variantInf.keys()]
+		allVariants = [(n[0],int(n[1]),n[2],n[3],n[4],n[5],n[6],variantInf[n]) for n in variantInf.keys()]
 
-		allVariants = [x for (y,x) in sorted(zip([int(n[1]) for n in allVariants],allVariants))]
+		#allVariants = [x for (y,x) in sorted(zip([int(n[1]) for n in allVariants],allVariants))]
+		allVariants = sorted(allVariants)
 
 		of = open(dn+'_golden.vcf','wb')
 		of.write(header)
@@ -124,7 +129,7 @@ def main():
 				if m == n[-1]:
 					of.write(m+'\n')
 				else:
-					of.write(m+'\t')
+					of.write(str(m)+'\t')
 		of.close()
 
 	if len(samList) > 0:

@@ -70,6 +70,16 @@ def main():
 			prevP = f.tell()
 			prevR = data[1:-1]
 
+	if len(sys.argv) == 7:
+		BEDFILE  = sys.argv[5]
+	ztV = 0
+	znP = 0
+	zfP = 0
+	znF = 0
+	znE = 0
+	if BEDFILE != None:
+		zbM = 0
+
 	for n_RI in ref_inds:
 		refName = n_RI[0]
 		# assumes fasta file is sane and has '\n' characters within long sequences
@@ -92,176 +102,192 @@ def main():
 					print i, len(myDat[i]), inWidth
 			exit(1)
 
-	myDat = bytearray(''.join(myDat)).upper()
-	myLen = len(myDat)
+		myDat = bytearray(''.join(myDat)).upper()
+		myLen = len(myDat)
 
+		""" **************************************** """
 
-	targRegionsFl = []
-	if len(sys.argv) == 7:
-		BEDFILE  = sys.argv[5]
-		bedfile = open(BEDFILE,'r')
-		minRegionLen = int(sys.argv[6])
-		for line in bedfile:
-			splt = line.split('\t')
-			if splt[0] == refName:
-				targRegionsFl.extend((int(splt[1]),int(splt[2])))
-	else:
-		BEDFILE  = None
-		targRegionsFl = [-1,myLen+1]
-
-
-	correctVariants = []
-	correctHashed   = {}
-	correctCov      = {}
-	correctReads    = {}
-	correctTargLen  = {}
-	nBelowMinRLen   = 0
-	for line in open(GOLDEN_VCF,'r'):
-		if line[0] != '#':
-			splt = line.split('\t')
-			var  = (int(splt[1]),splt[3],splt[4])
-			targInd = bisect.bisect(targRegionsFl,var[0])
-
-			if targInd%2 == 1:
-				targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
-				if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
-					correctVariants.append(var)
-					correctHashed[var] = 1
-					if 'DP=' in splt[7]:
-						correctCov[var] = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
-					if 'READS=' in splt[7]:
-						rstrings = re.findall(r"(READS=.*?)(?=;)",splt[7]) + re.findall(r"(READS=.*?)(?=\n)",splt[7])
-						correctReads[var] = ''.join([m[6:] for m in rstrings]).split(',')
-					correctTargLen[var] = targLen
-				else:
-					nBelowMinRLen += 1
-
-	#print correctVariants
-
-	workflowVariants = []
-	for line in open(WORKFLOW_VCF,'r'):
-		if line[0] != '#':
-			splt = line.split('\t')
-			var  = (int(splt[1]),splt[3],splt[4])
-			targInd = bisect.bisect(targRegionsFl,var[0])
-
-			if targInd%2 == 1:
-				targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
-				if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
-					if splt[5] == '.':
-						qual = DEFAULT_QUAL
-					else:
-						qual = float(splt[5])
-					cov  = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
-					workflowVariants.append([var,[qual,cov,targLen]])
-
-	nPerfect = 0
-	FPvariants = []
-	for [var,extraInfo] in workflowVariants:
-		if var in correctHashed:
-			nPerfect += 1
-			correctHashed[var] = 2
+		targRegionsFl = []
+		if len(sys.argv) == 7:
+			bedfile = open(BEDFILE,'r')
+			minRegionLen = int(sys.argv[6])
+			for line in bedfile:
+				splt = line.split('\t')
+				if splt[0] == refName:
+					targRegionsFl.extend((int(splt[1]),int(splt[2])))
+			bedfile.close()
 		else:
-			FPvariants.append([var,extraInfo])
-
-	
-	notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
+			BEDFILE  = None
+			targRegionsFl = [-1,myLen+1]
 
 
-	totalVariants = nPerfect + len(notFound)
+		correctVariants = []
+		correctHashed   = {}
+		correctCov      = {}
+		correctReads    = {}
+		correctTargLen  = {}
+		nBelowMinRLen   = 0
+		for line in open(GOLDEN_VCF,'r'):
+			if line[0] != '#':
+				splt = line.split('\t')
+				if splt[0] == refName:
+					var  = (int(splt[1]),splt[3],splt[4])
+					targInd = bisect.bisect(targRegionsFl,var[0])
+
+					if targInd%2 == 1:
+						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
+						if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
+							correctVariants.append(var)
+							correctHashed[var] = 1
+							if 'DP=' in splt[7]:
+								correctCov[var] = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
+							if 'READS=' in splt[7]:
+								rstrings = re.findall(r"(READS=.*?)(?=;)",splt[7]) + re.findall(r"(READS=.*?)(?=\n)",splt[7])
+								correctReads[var] = ''.join([m[6:] for m in rstrings]).split(',')
+							correctTargLen[var] = targLen
+						else:
+							nBelowMinRLen += 1
+
+		#print correctVariants
+
+		workflowVariants = []
+		for line in open(WORKFLOW_VCF,'r'):
+			if line[0] != '#':
+				splt = line.split('\t')
+				if splt[0] == refName:
+					var  = (int(splt[1]),splt[3],splt[4])
+					targInd = bisect.bisect(targRegionsFl,var[0])
+
+					if targInd%2 == 1:
+						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
+						if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
+							if splt[5] == '.':
+								qual = DEFAULT_QUAL
+							else:
+								qual = float(splt[5])
+							cov  = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
+							workflowVariants.append([var,[qual,cov,targLen]])
+
+		nPerfect = 0
+		FPvariants = []
+		for [var,extraInfo] in workflowVariants:
+			if var in correctHashed:
+				nPerfect += 1
+				correctHashed[var] = 2
+			else:
+				FPvariants.append([var,extraInfo])
+
+		
+		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 
 
-	# let's check for equivalent variants
-	delList_i = []
-	delList_j = []
-	regionsToCheck = []
-	for i in xrange(len(FPvariants)):
-		pos = FPvariants[i][0][0]
-		regionsToCheck.append((max([pos-EV_BPRANGE-1,0]),min([pos+EV_BPRANGE,len(myDat)-1])))
+		totalVariants = nPerfect + len(notFound)
+		if totalVariants == 0:
+			continue
 
-	for n in regionsToCheck:
-		refSection = myDat[n[0]:n[1]]
 
-		fpWithin = []
+		# let's check for equivalent variants
+		delList_i = []
+		delList_j = []
+		regionsToCheck = []
 		for i in xrange(len(FPvariants)):
-			m  = FPvariants[i][0]
-			if (m[0] > n[0] and m[0] < n[1]):
-				fpWithin.append((m,i))
-		fpWithin = sorted(fpWithin)
-		adj = 0
-		altSection = copy.deepcopy(refSection)
-		for (m,i) in fpWithin:
-			lr = len(m[1])
-			la = len(m[2])
-			dpos = m[0]-n[0]+adj
-			altSection = altSection[:dpos-1] + m[2] + altSection[dpos-1+lr:]
-			adj += la-lr
+			pos = FPvariants[i][0][0]
+			regionsToCheck.append((max([pos-EV_BPRANGE-1,0]),min([pos+EV_BPRANGE,len(myDat)-1])))
 
-		nfWithin = []
-		for j in xrange(len(notFound)):
-			m = notFound[j]
-			if (m[0] > n[0] and m[0] < n[1]):
-				nfWithin.append((m,j))
-		nfWithin = sorted(nfWithin)
-		adj = 0
-		altSection2 = copy.deepcopy(refSection)
-		for (m,j) in nfWithin:
-			lr = len(m[1])
-			la = len(m[2])
-			dpos = m[0]-n[0]+adj
-			altSection2 = altSection2[:dpos-1] + m[2] + altSection2[dpos-1+lr:]
-			adj += la-lr
+		for n in regionsToCheck:
+			refSection = myDat[n[0]:n[1]]
 
-		if altSection == altSection2:
+			fpWithin = []
+			for i in xrange(len(FPvariants)):
+				m  = FPvariants[i][0]
+				if (m[0] > n[0] and m[0] < n[1]):
+					fpWithin.append((m,i))
+			fpWithin = sorted(fpWithin)
+			adj = 0
+			altSection = copy.deepcopy(refSection)
 			for (m,i) in fpWithin:
-				if i not in delList_i:
-					delList_i.append(i)
-			for (m,j) in nfWithin:
-				if j not in delList_j:
-					delList_j.append(j)
+				lr = len(m[1])
+				la = len(m[2])
+				dpos = m[0]-n[0]+adj
+				altSection = altSection[:dpos-1] + m[2] + altSection[dpos-1+lr:]
+				adj += la-lr
 
-	nEquiv = 0
-	for i in sorted(list(set(delList_i)),reverse=True):
-		del FPvariants[i]
-	for j in sorted(list(set(delList_j)),reverse=True):
-		del notFound[j]
-		nEquiv += 1
-	nPerfect += nEquiv
+			nfWithin = []
+			for j in xrange(len(notFound)):
+				m = notFound[j]
+				if (m[0] > n[0] and m[0] < n[1]):
+					nfWithin.append((m,j))
+			nfWithin = sorted(nfWithin)
+			adj = 0
+			altSection2 = copy.deepcopy(refSection)
+			for (m,j) in nfWithin:
+				lr = len(m[1])
+				la = len(m[2])
+				dpos = m[0]-n[0]+adj
+				altSection2 = altSection2[:dpos-1] + m[2] + altSection2[dpos-1+lr:]
+				adj += la-lr
+
+			if altSection == altSection2:
+				for (m,i) in fpWithin:
+					if i not in delList_i:
+						delList_i.append(i)
+				for (m,j) in nfWithin:
+					if j not in delList_j:
+						delList_j.append(j)
+
+		nEquiv = 0
+		for i in sorted(list(set(delList_i)),reverse=True):
+			del FPvariants[i]
+		for j in sorted(list(set(delList_j)),reverse=True):
+			del notFound[j]
+			nEquiv += 1
+		nPerfect += nEquiv
+
+		ztV += totalVariants
+		znP += nPerfect
+		zfP += len(FPvariants)
+		znF += len(notFound)
+		znE += nEquiv
+		if BEDFILE != None:
+			zbM += nBelowMinRLen
+
+		#break
 
 
 	print '\n**********************************\n'
 	if BEDFILE != None:
 		print 'ONLY CONSIDERING VARIANTS FOUND WITHIN TARGETED REGIONS\n\n'
-	print 'Total Golden Variants:',totalVariants,'\n'
-	print 'Perfect Matches:',nPerfect,'({0:.2f}%)'.format(100.*float(nPerfect)/totalVariants)
-	print 'FP variants:   ',len(FPvariants),'({0:.2f}%)'.format(100.*float(len(FPvariants))/totalVariants)
-	print 'FN variants:   ',len(notFound),'({0:.2f}%)'.format(100.*float(len(notFound))/totalVariants)
-	print '\nNumber of equivalent variants denoted differently between the two vcfs:',nEquiv
+	print 'Total Golden Variants:',ztV,'\n'
+	print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
+	print 'FP variants:   ',zfP,'({0:.2f}%)'.format(100.*float(zfP)/ztV)
+	print 'FN variants:   ',znF,'({0:.2f}%)'.format(100.*float(znF)/ztV)
+	print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
 	if BEDFILE != None:
-		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',nBelowMinRLen
+		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',zbM
 	print '\n**********************************\n'
 
 
+	"""
 	# check if repeats are responsible for any pair of FN / FP variants
 	potential_pairs = []
 	delList_i = []
 	delList_j = []
-	#for i in xrange(len(FPvariants)):
-	#	pos = FPvariants[i][0][0]
-	#	roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
-	#	refSection1 = myDat[roi[0]:roi[1]]
-	#
-	#	for j in xrange(len(notFound)):
-	#		if (FPvariants[i][0][1],FPvariants[i][0][2]) == (notFound[j][1],notFound[j][2]):
-	#			pos = notFound[j][0]
-	#			roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
-	#			refSection2 = myDat[roi[0]:roi[1]]
-	#
-	#			(score,a1,a2) = needleman_wunsch(1, 1, str(refSection1), str(refSection2))
-	#			if score <= RR_THRESH:
-	#				potential_pairs.append((i,j,score))
-	#				delList_i.append(i)
-	#				delList_j.append(j)
+	for i in xrange(len(FPvariants)):
+		pos = FPvariants[i][0][0]
+		roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
+		refSection1 = myDat[roi[0]:roi[1]]
+	
+		for j in xrange(len(notFound)):
+			if (FPvariants[i][0][1],FPvariants[i][0][2]) == (notFound[j][1],notFound[j][2]):
+				pos = notFound[j][0]
+				roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
+				refSection2 = myDat[roi[0]:roi[1]]
+	
+				(score,a1,a2) = needleman_wunsch(1, 1, str(refSection1), str(refSection2))
+				if score <= RR_THRESH:
+					potential_pairs.append((i,j,score))
+					delList_i.append(i)
+					delList_j.append(j)
 
 	print 'Pairs of variants that originated from within one instance of a repetitive region, but were called by the workflow in another because the reads from the original region were confidently mapped elsewhere:',len(potential_pairs),'\n'
 	for n in potential_pairs:
@@ -277,8 +303,9 @@ def main():
 
 	
 
+	########################################################
 
-	""" ///////////////////////////////////////////////// """
+
 
 	for n in FPvariants:
 		print n
@@ -298,6 +325,7 @@ def main():
 				print ''
 		else:
 			print ''
+	"""
 
 
 if __name__ == '__main__':
