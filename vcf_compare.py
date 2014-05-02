@@ -72,6 +72,8 @@ def main():
 
 	if len(sys.argv) == 7:
 		BEDFILE  = sys.argv[5]
+	else:
+		BEDFILE  = None
 	ztV = 0
 	znP = 0
 	zfP = 0
