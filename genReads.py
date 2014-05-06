@@ -48,6 +48,9 @@ DEFAULT_FSD = 10							# default fragment-length std
 DEFAULT_WIN = 1000							# default sliding window size (for sampling reads / computing GC%)
 DEFAULT_SER = 0.01							# default average sequencing error rate
 DEFAULT_VRA = 0.00034						# default average rate of variant occurences
+DEFAULT_HVR = 0.2							# default heterozygous variant rate
+DEFAULT_ABM = 0.5							# default allele balance mean
+DEFAULT_ABS = 0.1							# default allele balance std
 DEFAULT_MBD = 95							# default minimum bed-file region size to consider for targeted sequencing
 DEFAULT_BCV = 0								# default coverage in non-targeted regions
 DEFAULT_QSM = 'models/qModel_AlvaroPhix.p'	# default quality-score model
@@ -57,6 +60,8 @@ PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -o <out.prefi
 
 PARSER.add_option('-p',    help='Generate paired-end reads [%default]',               dest='BOOL_PE', default=False,       action='store_true')
 PARSER.add_option('-b',    help='Input bed file containing regions to sample from',   dest='BED',     default=None,        action='store',      metavar='<targets.bed>')
+PARSER.add_option('-a',    help='Allele balance (% ref reads) mean [%default]',       dest='ABM',     default=DEFAULT_ABM, action='store',      metavar='<float>')
+PARSER.add_option('-A',    help='Allele balance std [%default]',                      dest='ABS',     default=DEFAULT_ABS, action='store',      metavar='<float>')
 PARSER.add_option('-B',    help='Minimum bed file region length [%default]',          dest='MBD',     default=DEFAULT_MBD, action='store',      metavar='<int>')
 PARSER.add_option('-c',    help='Average coverage [%default]',                        dest='COV',     default=DEFAULT_COV, action='store',      metavar='<float>')
 PARSER.add_option('-C',    help='Avg coverage in non-targeted regions [%default]',    dest='BCV',     default=DEFAULT_BCV, action='store',      metavar='<float>')
@@ -72,6 +77,7 @@ PARSER.add_option('-S',    help='Average sequencing error rate [%default]',     
 PARSER.add_option('-v',    help='Input VCF file',                                     dest='VCF',     default=None,        action='store',      metavar='<str>')
 PARSER.add_option('-V',    help='Average variant occurence rate [%default]',          dest='VRA',     default=DEFAULT_VRA, action='store',      metavar='<float>')
 PARSER.add_option('-w',    help='Window size for computing GC% [%default]',           dest='WIN',     default=DEFAULT_WIN, action='store',      metavar='<int>')
+PARSER.add_option('-z',    help='Ratio of heterozygous variants [%default]',          dest='HVR',     default=DEFAULT_HVR, action='store',      metavar='<float>')
 PARSER.add_option('--FA',  help='Output modified reference as fasta file [%default]', dest='BOOL_FA', default=False,       action='store_true')
 PARSER.add_option('--SAM', help='Output correct alignment as SAM file [%default]',    dest='BOOL_SA', default=False,       action='store_true')
 PARSER.add_option('--VCF', help='Output introduced variants as VCF file [%default]',  dest='BOOL_VC', default=False,       action='store_true')
@@ -134,6 +140,10 @@ else:
 	SEQUENCING_INDELS  = 0
 	SEQUENCING_QSCORES = 0
 
+HET_VAR        = float(OPTS.HVR)
+AB_MEAN        = float(OPTS.ABM)
+AB_STD         = float(OPTS.ABS)
+
 # consider fragment sizes within +- 3 stds
 if PAIRED_END:
 	MIN_SAMPLE_SIZE = FRAGMENT_SIZE+3*FRAGMENT_STD
@@ -152,6 +162,10 @@ if GC_BIAS:
 	RELATIVE_GC_COVERAGE_BIAS = [np.exp(-(((n-0.5)**2)/(2*(0.15**2)))) for n in GC_COVERAGE]
 else:
 	RELATIVE_GC_COVERAGE_BIAS = [1. for n in GC_COVERAGE]
+
+AB      = np.linspace(AB_MEAN-3*AB_STD,AB_MEAN+3*AB_STD,20).tolist()
+AB_PROB = [np.exp(-(((n-AB_MEAN)**2)/(2*(AB_STD**2)))) for n in AB]
+AB_PROB = [n/sum(AB_PROB) for n in AB_PROB]
 
 if OPTS.RNG == None:
 	RNG_SEED   = random.randint(1,99999999)
@@ -179,7 +193,7 @@ RNG_MULT   = .05
 if GC_BIAS:
 	COV_MULT   = .1
 else:
-	COV_MULT   = .05
+	COV_MULT   = .01
 
 # dummy quality score if no model is used
 DUMMY_QSCORE = 30
@@ -255,11 +269,14 @@ if OPTS.OUT == None:
 if AVG_COVERAGE <= 0.:
 	print 'Error: Average coverage must be greater than 0.'
 	exit(1)
-if AVG_VAR_FREQ < 0.:
-	print 'Error: Average variant frequency must be non-negative.'
+if AVG_VAR_FREQ < 0. or AVG_VAR_FREQ >= 1.:
+	print 'Error: Average variant frequency must be between [0,1)'
 	exit(1)
-if AVG_SSE < 0.:
-	print 'Error: Average SSE rate must be non-negative.'
+if AVG_SSE < 0. or AVG_SSE >= 1.:
+	print 'Error: Average SSE rate must be between [0,1)'
+	exit(1)
+if HET_VAR < 0. or HET_VAR >= 1.:
+	print 'Error: Heterozygous variant ratio must be between [0,1)'
 	exit(1)
 if READLEN <= 0:
 	print 'Error: Read length must be greater than 0.'
@@ -268,10 +285,23 @@ if FRAGMENT_SIZE <= 0:
 	print 'Error: Mean fragment length must be greater than 0.'
 	exit(1)
 if FRAGMENT_STD < 0:
-	print 'Error: Fragment length standard deviation must be non-negative'
+	print 'Error: Fragment length standard deviation must be non-negative.'
 	exit(1)
 if COV_WINDOW <= 0:
 	print 'Error: Sliding sampling window must be greater than 0.'
+	exit(1)
+
+if AB_MEAN < 0. or AB_MEAN >= 1.:
+	print 'Error: AB_MEAN must be between [0,1)'
+	exit(1)
+if AB_STD < 0.:
+	print 'Error: AB_STD must be non-negative.'
+	exit(1)
+if AB_MEAN - 3*AB_STD < 0.:
+	print 'Error: AB_MEAN - 3*AB_STD must be greater than 0.'
+	exit(1)
+if AB_MEAN + 3*AB_STD >= 1.:
+	print 'Error: AB_MEAN + 3*AB_STD must be less than 1.'
 	exit(1)
 
 if PAIRED_END:
@@ -342,6 +372,10 @@ def main():
 		for j in range(1,len(cpSSE[i])):
 			cpSSE[i][j] = cpSSE[i][j]+cpSSE[i][j-1]
 	#print cpSSE
+
+	# create cumulative probability lists for allele balance
+	cpAB = np.cumsum(AB_PROB).tolist()[:-1]
+	cpAB.insert(0,0.)
 
 	# load empirical quality score distributions
 	[allPMFs,probQ,Qscores,qOffset] = pickle.load(open(QSCORE_MODEL,'rb'))
@@ -906,6 +940,25 @@ def main():
 				# the snp we're trying to insert was affected by a random variant
 				pass
 
+		nSNPs   = len(snps)
+		nIndels = len(indelList)
+		# initialize variant coverage dictionaries
+		snpKeys = sorted(snps.keys())
+		snpCoverage = {}
+		snpReads    = {}
+		snpTargeted = {}
+		snpAB       = {}
+		for k in snpKeys:
+			snpCoverage[k] = 0
+			snpReads[k]    = []
+			if random.random() < HET_VAR:
+				snpAB[k]       = AB[randEvent(cpAB)]
+		indelCoverage = [0 for n in indelList]
+		indelReads    = [[] for n in indelList]
+		#indelAB       = [AB[randEvent(cpAB)] for n in indelList]
+		indelTargeted = {}
+		#print indelList
+
 
 		"""/////////////////////////////////////////////////////
 		////////////    MORE MISCELLANEOUS STUFF    ////////////
@@ -914,7 +967,7 @@ def main():
 		# print number of variants introduced and how long it took to do so
 		if NATURAL_INDELS or NATURAL_SNPS or NATURAL_SVS:
 			print '{0:.3f} (sec)'.format(time.time()-indelStart)
-			print nSNPs, 'SNPs'
+			print nSNPs, 'SNPs', '('+str(len(snpAB))+' hets)'
 			print nIndels, 'indels'
 			print nSVs, 'SVs'
 			print ''
@@ -939,19 +992,6 @@ def main():
 		"""/////////////////////////////////////////////////////
 		////////////   SOME WINDOW PREPROCESSING   /////////////
 		/////////////////////////////////////////////////////"""
-
-		# initialize variant coverage dictionaries
-		snpKeys = sorted(snps.keys())
-		snpCoverage = {}
-		snpReads    = {}
-		snpTargeted = {}
-		for k in snpKeys:
-			snpCoverage[k] = 0
-			snpReads[k]    = []
-		indelCoverage = [0 for n in indelList]
-		indelReads    = [[] for n in indelList]
-		indelTargeted = {}
-		#print indelList
 
 
 		# construct regions to sample from (from input bed file, if present)
@@ -1387,26 +1427,40 @@ def main():
 					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
 
 
-				if SAVE_VCF:
-					(r1i, r1f) = (r1posMyDat, r1posMyDat+READLEN)
-					if PAIRED_END:
-						(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
+				#if SAVE_VCF:
+				(r1i, r1f) = (r1posMyDat, r1posMyDat+READLEN)
+				if PAIRED_END:
+					(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
 
-					for sk in relevantSNP:
-						if (sk >= r1i and sk < r1f):
-							snpReads[sk].append(r1NameSuffix)
-							snpCoverage[sk] += 1
-						elif PAIRED_END and (sk >= r2i and sk < r2f):
-							snpReads[sk].append(r2NameSuffix)
-							snpCoverage[sk] += 1
-					for j in xrange(len(hitInds)):
-						indStart = hitInds[j][2]
-						if (indStart >= r1i and indStart < r1f):
-							indelCoverage[j+afwi/2] += 1
-							indelReads[j+afwi/2].append(r1NameSuffix)
-						elif PAIRED_END and (indStart >= r2i and indStart < r2f):
-							indelCoverage[j+afwi/2] += 1
-							indelReads[j+afwi/2].append(r2NameSuffix)
+				for sk in relevantSNP:
+					if (sk >= r1i and sk < r1f-1):
+						snpReads[sk].append(r1NameSuffix)
+						snpCoverage[sk] += 1
+						#print (r1i,r1f), sk, snps[sk][2], chr(snps[sk][0]).upper(), '->', snps[sk][1].upper(), ',', chr(r1[snps[sk][2]-r1i+1]).upper()
+						#print r1
+
+						# if this snp is heterozygous, lets trade it out for the ref allele with it's corresponding allele balance probability
+						if sk in snpAB and random.random() < snpAB[sk]:
+							r1[sk-r1i+1] = chr(snps[sk][0]).upper()
+							
+					elif PAIRED_END and (sk >= r2i and sk < r2f-1):
+						snpReads[sk].append(r2NameSuffix)
+						snpCoverage[sk] += 1
+						#print (r2i,r2f), sk, chr(snps[sk][0]).upper(), '->', snps[sk][1].upper(), ',', chr(r2[(READLEN-1)-(sk-r2i+1)]).upper()
+						#print r2
+
+						# het
+						if sk in snpAB and random.random() < snpAB[sk]:
+							r2[(READLEN-1)-(sk-r2i+1)] = TO_UPPER_COMP[chr(snps[sk][0])]
+
+				for j in xrange(len(hitInds)):
+					indStart = hitInds[j][2]
+					if (indStart >= r1i and indStart < r1f-1):
+						indelCoverage[j+afwi/2] += 1
+						indelReads[j+afwi/2].append(r1NameSuffix)
+					elif PAIRED_END and (indStart >= r2i and indStart < r2f-1):
+						indelCoverage[j+afwi/2] += 1
+						indelReads[j+afwi/2].append(r2NameSuffix)
 
 
 				if SAVE_SAM:
