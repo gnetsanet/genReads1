@@ -27,7 +27,7 @@ import re
 import numpy as np
 #import matplotlib.pyplot as mpl
 
-from misc	import histoxy, needleman_wunsch
+#from misc	import histoxy, needleman_wunsch
 
 SAMTOOLS_EXEC = '/Users/zach/Desktop/bioinformatics_stuff/samtools'
 
