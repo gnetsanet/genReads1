@@ -14,7 +14,7 @@ Contact:		zstephe2@illinois.edu
 
 Usage:
 
-python vcf_compare.py ref.fa golden.vcf workflow.vcf workflow.bam
+python vcf_compare.py ref.fa golden.vcf workflow.vcf
 
 ************************************************** """
 
@@ -40,15 +40,14 @@ DEFAULT_QUAL = -666
 
 def main():
 
-	if len(sys.argv) != 5 and len(sys.argv) != 7:
-		print '\nUsage:\n\npython vcf_compare.py ref.fa golden.vcf workflow.vcf workflow.sam\n'
+	if len(sys.argv) != 4 and len(sys.argv) != 6:
+		print '\nUsage:\n\npython vcf_compare.py ref.fa golden.vcf workflow.vcf\n'
 		print 'OR:'
-		print '\nUsage:\n\npython vcf_compare.py ref.fa golden.vcf workflow.vcf workflow.sam targetedRegions.bed minRegionLen\n'
+		print '\nUsage:\n\npython vcf_compare.py ref.fa golden.vcf workflow.vcf targetedRegions.bed minRegionLen\n'
 		exit(1)
 
 	GOLDEN_VCF   = sys.argv[2]
 	WORKFLOW_VCF = sys.argv[3]
-	WORKFLOW_BAM = sys.argv[4]
 	REFERENCE    = sys.argv[1]
 
 	ref = []
@@ -70,8 +69,8 @@ def main():
 			prevP = f.tell()
 			prevR = data[1:-1]
 
-	if len(sys.argv) == 7:
-		BEDFILE  = sys.argv[5]
+	if len(sys.argv) == 6:
+		BEDFILE  = sys.argv[4]
 	else:
 		BEDFILE  = None
 	ztV = 0
@@ -110,9 +109,9 @@ def main():
 		""" **************************************** """
 
 		targRegionsFl = []
-		if len(sys.argv) == 7:
+		if len(sys.argv) == 6:
 			bedfile = open(BEDFILE,'r')
-			minRegionLen = int(sys.argv[6])
+			minRegionLen = int(sys.argv[5])
 			for line in bedfile:
 				splt = line.split('\t')
 				if splt[0] == refName:
@@ -141,8 +140,15 @@ def main():
 						if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
 							correctVariants.append(var)
 							correctHashed[var] = 1
+							cov = 0
 							if 'DP=' in splt[7]:
-								correctCov[var] = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
+								cov = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
+							else:
+								# check for different formatting
+								if ':DP' in splt[8] or 'DP:' in splt[8]:
+									dpInd = splt[8].split(':').index('DP')
+									cov   = int(splt[9].split(':')[dpInd])
+							correctCov[var] = cov
 							if 'READS=' in splt[7]:
 								rstrings = re.findall(r"(READS=.*?)(?=;)",splt[7]) + re.findall(r"(READS=.*?)(?=\n)",splt[7])
 								correctReads[var] = ''.join([m[6:] for m in rstrings]).split(',')
@@ -167,7 +173,14 @@ def main():
 								qual = DEFAULT_QUAL
 							else:
 								qual = float(splt[5])
-							cov  = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
+							cov = 0
+							if 'DP=' in splt[7]:
+								cov  = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
+							else:
+								# check for different formatting
+								if ':DP' in splt[8] or 'DP:' in splt[8]:
+									dpInd = splt[8].split(':').index('DP')
+									cov   = int(splt[9].split(':')[dpInd])
 							workflowVariants.append([var,[qual,cov,targLen]])
 
 		nPerfect = 0
@@ -178,13 +191,13 @@ def main():
 				correctHashed[var] = 2
 			else:
 				FPvariants.append([var,extraInfo])
-
 		
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
-
+		print len(notFound), len(FPvariants)
 
 		totalVariants = nPerfect + len(notFound)
 		if totalVariants == 0:
+			zfP += len(FPvariants)
 			continue
 
 
