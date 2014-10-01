@@ -101,12 +101,17 @@ def main():
 		targeted = ''
 		coverage = ''
 		readsCov = ''
+		alleleFr = ''
 		soi = variantInf[n]
 
-		coverage = 'DP='+str(sum([int(m[3:]) for m in re.findall(r"(DP=.*?)(?=;)",soi)]))
+		if 'DP=' in soi:
+			coverage = 'DP='+str(sum([int(m[3:]) for m in re.findall(r"(DP=.*?)(?=;)",soi)]))
 
 		if 'TARGETED=1' in soi:
 			targeted = 'TARGETED=1;'
+
+		if 'AF=' in soi:
+			alleleFr = 'AF='+re.findall(r"(AF=.*?)(?=;)",soi)[0]
 
 		rstrs = [m[6:] for m in re.findall(r"(READS=.*?)(?=;)",soi)]
 		if rstrs == ['']:
@@ -114,7 +119,7 @@ def main():
 		else:
 			readsCov = 'READS=' + ','.join(rstrs)
 
-		variantInf[n] = coverage+';'+targeted+readsCov
+		variantInf[n] = coverage+';'+targeted+alleleFr+readsCov
 
 	if len(vcfList) > 0:
 		allVariants = [(n[0],int(n[1]),n[2],n[3],n[4],n[5],n[6],variantInf[n]) for n in variantInf.keys()]

@@ -18,6 +18,7 @@ import os
 import sys
 import copy
 import random
+import re
 import time
 import bisect
 import cPickle as pickle
@@ -535,6 +536,8 @@ def main():
 		OUTVCF = open(OUTFILE_NAME+'_golden.vcf','wb')
 		OUTVCF.write('##fileformat=VCFv4.1\n')
 		OUTVCF.write('##reference='+REFERENCE+'\n')
+		OUTVCF.write('##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">\n')
+		OUTVCF.write('##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n')
 		OUTVCF.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">\n')
 		OUTVCF.write('##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n')
 		OUTVCF.write('##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">\n')
@@ -610,9 +613,6 @@ def main():
 		cumLens = np.cumsum(myLens)
 		lenAdj  = 0
 		del myLens
-		indelList = []
-		afterThis = [-1]
-		addThis   = [0]
 
 		# normalize variant frequencies
 		var_mult = AVG_VAR_FREQ/(INDEL_FREQ+SNP_FREQ)
@@ -626,7 +626,7 @@ def main():
 			for i in xrange(nIndels):
 				p1 = random.randint(0,len(myDat)-1)
 				p2 = random.randint(0,len(myDat[p1])-1)
-				idlen   = randEvent(cpIndel)+1
+				idlen   = randEvent(cpIndel)+1	# rawr
 				if random.random() < INS_FREQ:
 					idT = 'I'
 					# insertion:
@@ -657,8 +657,10 @@ def main():
 
 
 		# introduce variants from provided input VCF file
-		input_snps = []
-		input_inds = {}
+		input_snps    = []
+		input_snps_AF = []
+		input_inds    = {}
+		input_inds_AF = {}
 		if INPUT_VCF != None:
 			invcf = open(INPUT_VCF,'r')
 			for line in invcf:
@@ -668,26 +670,37 @@ def main():
 						pos = int(splt[1])
 						rnt = splt[3]
 						ant = splt[4]
+						inf = splt[7]
 						# structural variants aren't supported yet, sorry!
 						if (splt[2] != '.') or ('[' in ant) or (']' in ant) or (':' in ant) or ('SVTYPE' in splt[7]):
 							print "skipping variant:",line
 							continue
-						# ignore variants with alternate alleles for now..
-						if (',' in rnt) or (',' in ant):
-							print "skipping variant:",line
-							continue
+						# if multiple alternate alleles, lets just use first one...
+						if ',' in ant:
+							ant = ant.split(',')[0]
+						# lets use the AF field, if present, to force a variant to be heterozygous
+						myAF = 1.
+						if 'AF=' in inf:
+							myAF = float(re.findall(r"AF=.*?(?=;)",inf)[0][3:].split(',')[0])
+							if myAF < 0.01 or myAF > 0.99:
+								myAF = 1.
 						# snps
 						if len(rnt) == len(ant):
 							for i in xrange(len(rnt)):
 								input_snps.append((pos+i,rnt[i],ant[i]))
+								input_snps_AF.append(myAF)
 						# insertion
 						elif len(rnt) == 1 and len(ant) > 1:
-							SVsToAttempt.append(([pos,ant[1:]],'BI'))
+							v = ((pos,ant[1:]),'BI')
+							SVsToAttempt.append(v)
 							input_inds[(pos,rnt,ant)] = 1
+							input_inds_AF[tuple(v)] = myAF
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
-							SVsToAttempt.append(([pos,len(rnt)-1],'BD'))
+							v = ((pos,len(rnt)-1),'BD')
+							SVsToAttempt.append(v)
 							input_inds[(pos,rnt,ant)] = 1
+							input_inds_AF[tuple(v)] = myAF
 						# otherwise I have no idea, and don't feel like figuring it out now.
 						else:
 							print "skipping variant:",line
@@ -713,14 +726,18 @@ def main():
 
 		SVregions = []	# disallow small "normal" indels from happening within regions affected by SVs
 		nSVs = -len(input_inds)
+		indelsToAttempt_AF = {}		# key: indel variant tuple, value: allele freq
 		for i in xrange(len(SVsToAttempt)):
 			n = SVsToAttempt[i]
 
 			# some elaborate code goes here to prevent overlapping events
+			# TBD
 
 			# check if event is in bounds
+			# TBD
 
 			# check if event involves any Ns
+			# TBD
 
 			nSVs += 1
 			idT = n[1]
@@ -746,12 +763,19 @@ def main():
 				seq = str(seq)
 
 			if idT == 'BD':
-				indelsToAttempt.append((p1,p2,Svv[1],'BD',i,''))
+				v = (p1,p2,Svv[1],'BD',i,'')
+				indelsToAttempt.append(v)
 				SVregions.append((Svv[0],Svv[0]+Svv[1]))
+				# if event happens to be heterozygous, lets pass that information along in another list
+				if tuple(n) in input_inds_AF:
+					indelsToAttempt_AF[tuple(v)] = input_inds_AF[tuple(n)]
 
 			elif idT == 'BI':
-				indelsToAttempt.append((p1,p2,len(Svv[1]),'BI',i,Svv[1]))
+				v = (p1,p2,len(Svv[1]),'BI',i,Svv[1])
+				indelsToAttempt.append(v)
 				SVregions.append((Svv[0],Svv[0]+len(Svv[1])))
+				if tuple(n) in input_inds_AF:
+					indelsToAttempt_AF[tuple(v)] = input_inds_AF[tuple(n)]
 
 			elif idT == 'R':
 				indelsToAttempt.append((p1,p2,len(Svv[1])*Svv[2],'BI',i,''.join([Svv[1]]*Svv[2])))
@@ -779,6 +803,7 @@ def main():
 				indelsToAttempt.append((p3,p4,Svv[1],'BI',i,newSeq))
 				SVregions.append((Svv[0],Svv[0]+Svv[1]))
 				SVregions.append((Svv[2],Svv[2]+Svv[1]))
+		del input_inds_AF
 
 
 		"""/////////////////////////////////////////////////////////////
@@ -790,9 +815,14 @@ def main():
 			if indelsToAttempt[i][:3] == indelsToAttempt[i-1][:3] and indelsToAttempt[i][3] == 'BI' and indelsToAttempt[i-1][3] == 'BD':
 				(indelsToAttempt[i],indelsToAttempt[i-1]) = (indelsToAttempt[i-1],indelsToAttempt[i])
 
-		prevP1 = -1
-		prevP2 = -1
-		svInds = {}
+		prevP1       = -1
+		prevP2       = -1
+		prevP2_adj   = 0
+		svInds       = {}
+		indelList    = []
+		afterThis    = [-1]
+		addThis      = [0]
+		indelList_AF = {}
 		for n in indelsToAttempt:
 
 			idT   = n[3]
@@ -804,6 +834,7 @@ def main():
 
 			if p1 != prevP1:
 				prevP2 = -1
+				prevP2_adj = 0
 			if idT != 'BD' and idT != 'BI':
 				if len(myDat[p1]) <= p2 or len(myDat[p1]) <= MAX_INDEL:
 					continue
@@ -835,9 +866,10 @@ def main():
 				if p2 == 0:
 					myDat[p1] = seq + myDat[p1]
 				else:
-					myDat[p1] = myDat[p1][:p2] + seq + myDat[p1][p2:]
+					myDat[p1] = myDat[p1][:p2+prevP2_adj] + seq + myDat[p1][p2+prevP2_adj:]
 				idT = 'I'
 				lenAdj += idlen
+				prevP2_adj += idlen
 				indBp = ind+idlen+1
 
 			elif idT == 'D':
@@ -859,12 +891,12 @@ def main():
 
 				hungryHungry = 0	# feed me nucleotides!
 				hp1 = p1
-				hp2 = p2
+				hp2 = p2+prevP2_adj
 				if insSeq == '**inv**':
 					hp2 += idlen
 				seq = bytearray()
 				while hungryHungry < idlen:
-					#print hp1, hp2, len(myDat), len(myDat[hp1]), hungryHungry,'/',idlen
+					#print '\n', hp1, hp2, len(myDat), len(myDat[hp1]), hungryHungry,'/',idlen
 					if len(myDat[hp1][hp2:]) <= idlen-hungryHungry:
 						hungryHungry += len(myDat[hp1][hp2:])
 						seq.extend(myDat[hp1][hp2:])
@@ -878,9 +910,13 @@ def main():
 
 				idT = 'D'
 				lenAdj -= idlen
+				prevP2_adj -= idlen
 				indBp = ind+1
 
-			indelList.append([idT,idlen,ind,indBp,seq])
+			v = [idT,idlen,ind,indBp,str(seq)]
+			indelList.append(v)
+			if tuple(n) in indelsToAttempt_AF:
+				indelList_AF[tuple(v)] = indelsToAttempt_AF[tuple(n)]
 			afterThis.extend([ind,indBp])
 			if idT == 'D':
 				idlen = -idlen
@@ -891,6 +927,8 @@ def main():
 			prevP1 = p1
 			prevP2 = p2+idlen
 		del cumLens
+		del indelsToAttempt
+		del indelsToAttempt_AF
 
 
 		"""//////////////////////////////////////////////////////
@@ -915,6 +953,9 @@ def main():
 			nSNPs = int(rSF*myLen+.5)
 			for i in xrange(nSNPs):
 				spos = random.randint(0,myLen-1)
+				# have we already inserted a snp here? if so, skip plz
+				if spos in snps:
+					continue
 				prevBase = myDat[spos]
 				if prevBase in both:
 					newBase = randEvent(cpSNP[NUCL_NUM[prevBase]])
@@ -926,21 +967,26 @@ def main():
 						continue
 					snps[spos] = (prevBase,newBase,spos)
 					myDat[spos] = newBase
-					#print prevBase,'->',newBase,myDat[spos]
+					#print chr(prevBase),'->',newBase,chr(myDat[spos]), spos
 
-		for n in input_snps:
+		inSNP_AF = {}	# sloppy temp dictionary
+		for i in xrange(len(input_snps)):
+			n = input_snps[i]
 			spos = n[0]-1
-			spos -= addThis[bisect.bisect(afterThis,spos)-1]
+			spos -= addThis[bisect.bisect(afterThis,spos)]
+
 			#print n, spos, chr(myDat[spos])
-			if chr(myDat[spos]).upper() == n[1]:
+			if spos not in snps and chr(myDat[spos]).upper() == n[1]:
 				snps[spos] = (myDat[spos],n[2],spos)
 				myDat[spos] = n[2]
 				nSNPs += 1
+				inSNP_AF[spos] = input_snps_AF[i]
 			else:
-				# the snp we're trying to insert was affected by a random variant
+				# the snp we're trying to insert was affected by a random variant, skip it, sorry.
 				pass
+		del input_snps_AF
 
-		nSNPs   = len(snps)
+		nSNPs   = len(snps)			# I'm reusing this variable name? -.-
 		nIndels = len(indelList)
 		# initialize variant coverage dictionaries
 		snpKeys = sorted(snps.keys())
@@ -951,13 +997,27 @@ def main():
 		for k in snpKeys:
 			snpCoverage[k] = 0
 			snpReads[k]    = []
-			if random.random() < HET_VAR:
-				snpAB[k]       = AB[randEvent(cpAB)]
+			if k in inSNP_AF:
+				if inSNP_AF[k] < 1.:
+					snpAB[k] = inSNP_AF[k]
+			else:
+				if random.random() < HET_VAR:
+					snpAB[k] = AB[randEvent(cpAB)]
 		indelCoverage = [0 for n in indelList]
 		indelReads    = [[] for n in indelList]
-		#indelAB       = [AB[randEvent(cpAB)] for n in indelList]
 		indelTargeted = {}
+		indelAB       = {}
 		#print indelList
+		#print indelList_AF
+		for i in xrange(len(indelList)):
+			thij = tuple(indelList[i])
+			if thij in indelList_AF:
+				if indelList_AF[thij] < 1.:
+					indelAB[thij] = indelList_AF[thij]
+			else:
+				if random.random() < HET_VAR:
+					indelAB[thij] = AB[randEvent(cpAB)]
+		print '\n'
 
 
 		"""/////////////////////////////////////////////////////
@@ -968,7 +1028,7 @@ def main():
 		if NATURAL_INDELS or NATURAL_SNPS or NATURAL_SVS:
 			print '{0:.3f} (sec)'.format(time.time()-indelStart)
 			print nSNPs, 'SNPs', '('+str(len(snpAB))+' hets)'
-			print nIndels, 'indels'
+			print nIndels, 'indels', '('+str(len(indelAB))+' hets)'
 			print nSVs, 'SVs'
 			print ''
 
@@ -1298,7 +1358,7 @@ def main():
 							q1.append(qscore1)
 							q2.append(qscore2)
 
-							# introduce sequencing SNPS based on their quality score
+							# introduce sequencing substitution errors based on their quality score
 							if SEQUENCING_SNPS:
 								if random.random() < pError[qscore1]:
 									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
@@ -1307,7 +1367,7 @@ def main():
 									r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
 									nSeqSubErr += 1
 					else:
-						# if no q-scores, introduce SNPS based on desired average frequency
+						# if no q-scores, introduce sequencing substitution based on desired average frequency
 						if SEQUENCING_SNPS:
 							for j in xrange(READLEN):
 								if random.random() < positionSSErate[j]:
@@ -1342,6 +1402,90 @@ def main():
 					rtt = [r1posMyDat,r2posMyDat]
 				else:
 					rtt = [r1posMyDat]
+
+				#if SAVE_VCF:
+				(r1i, r1f) = (r1posMyDat, r1posMyDat+READLEN)
+				if PAIRED_END:
+					(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
+				
+				#
+				# if indel is heterozygous, lets trade it out for the ref allele and remove it from cigar-string computations (with corresponding allele balance probability of course)
+				#print 'read #:',str(nReads+myJobOffset+bigReadNameOffset)+'/1'
+				#print (r1i, r1f)
+				#print 'hitInds:', hitInds
+				skipTheseInds = []
+				adjustedVariants = {tuple(n):0 for n in hitInds}
+				for j in xrange(len(hitInds)):
+					thij     = tuple(hitInds[j])
+					adj      = adjustedVariants[thij]
+					indStart = thij[2]
+					if thij in indelAB and random.random() < indelAB[thij]:
+						#print ''
+						#print hitInds[j]
+						#print (r1i,r1f),(r2i,r2f),indStart
+						if (indStart >= r1i and indStart < r1f-1):
+							#print 'read #:',str(nReads+myJobOffset+bigReadNameOffset)+'/1'
+							#print r1
+							r1Ind = indStart-r1i+1
+
+							# if alt allele is deletion, insert ref bases into read and trim to read length
+							if thij[0] == 'D':
+								r1 = r1[:r1Ind+adj] + thij[4].upper() + r1[r1Ind+adj:]
+								r1 = r1[:READLEN]
+								# every variant in the read after this one needs to have its position adjusted, oh joy.
+								for j2 in xrange(j+1,len(hitInds)):
+									adjustedVariants[tuple(hitInds[j2])] += thij[1]
+
+							# if alt allele is insertion, delete alt bases and fill in with subsequent sequence data.
+							# have to make sure we catch any variants that might occur in the "reserve" sequence that we append!
+							elif thij[0] == 'I':
+								buflen    = min([READLEN,thij[1]])
+								extra_adj = max([0,thij[3]+adj-r1f])
+								# check if enough room left in window to fill in gap left by removing insertion
+								if len(currentDat[n0+READLEN+extra_adj-adj:]) < buflen:
+									continue
+								else:
+									(e1, e2) = (n0+READLEN+extra_adj-adj, n0+READLEN+extra_adj-adj+buflen)
+									extra = bytearray(currentDat[e1:e2])
+									r1 = r1[:r1Ind+adj] + r1[r1Ind+thij[1]+adj:] + extra
+									r1 = r1[:READLEN]
+									for j2 in xrange(j+1,len(hitInds)):
+										adjustedVariants[tuple(hitInds[j2])] -= thij[1]
+
+						elif PAIRED_END and (indStart >= r2i and indStart < r2f-1):
+							#print 'read #:',str(nReads+myJobOffset+bigReadNameOffset)+'/2'
+							#print r2
+							#print bytearray([TO_UPPER_COMP[n] for n in r2][::-1])
+							r2IndComp = indStart-r2i+1
+
+							if thij[0] == 'D':
+								r2 = bytearray([TO_UPPER_COMP[n] for n in r2][::-1])
+								r2 = r2[:r2IndComp+adj] + thij[4].upper() + r2[r2IndComp+adj:]
+								r2 = r2[:READLEN]
+								r2 = bytearray([TO_UPPER_COMP[n] for n in r2][::-1])
+								for j2 in xrange(j+1,len(hitInds)):
+									adjustedVariants[tuple(hitInds[j2])] += thij[1]
+
+							elif thij[0] == 'I':
+								buflen    = min([READLEN,thij[1]])
+								extra_adj = max([0,thij[3]+adj-r2f])
+								if len(currentDatRC[:revoff-extra_adj+adj]) < buflen:
+									print '\n\nproblem, captain!\n\n'
+								else:
+									r2 = bytearray([TO_UPPER_COMP[n] for n in r2][::-1])
+									(e1, e2) = (revoff-extra_adj+adj-buflen, revoff-extra_adj+adj)
+									extra = bytearray(currentDatRC[e1:e2])
+									r2 = r2[:r2IndComp+adj] + r2[r2IndComp+thij[1]+adj:]
+									r2 = extra + bytearray([TO_UPPER_COMP[n] for n in r2][::-1])
+									r2 = r2[len(r2)-READLEN:]
+									for j2 in xrange(j+1,len(hitInds)):
+										adjustedVariants[tuple(hitInds[j2])] -= thij[1]
+
+						else:
+							continue
+
+						skipTheseInds.append(hitInds[j])
+
 				for rp in rtt:
 					# I want to get nucleotides 'ni' to 'nf' from our modified reference and get the
 					# corresponding bases from the original reference, as well as a cigar string that relates them
@@ -1370,10 +1514,26 @@ def main():
 
 					bpi = ptbi/2
 					bpf = min([ptbf/2,len(indelList)-1])
-					affectedBp = indelList[bpi:bpf]
-					# make sure we catch insertions near end of read
-					if indelList[bpf][2]+1 < nf:
-						affectedBp.append(indelList[bpf])
+					affectedBp = copy.deepcopy(indelList[bpi:bpf+10])	# grab 10 extra variants in case het-insert deleted region fill-in contains variants
+					## make sure we catch insertions near end of read
+					#if indelList[bpf][2]+1 < nf:
+					#	affectedBp.append(indelList[bpf])
+
+					# take out indels if this read is heterozygous and has ref allele instead
+					affectedBp = [n for n in affectedBp if n not in skipTheseInds]
+					# adjust indel offsets of variants following hets that have ref instead
+					for i in xrange(len(affectedBp)):
+						tabi = tuple(affectedBp[i])
+						if tabi in adjustedVariants:
+							adj = adjustedVariants[tabi]
+							affectedBp[i][2] += adj
+							affectedBp[i][3] += adj
+					# remove irrelevant variants
+					affectedBp = [n for n in affectedBp if n[2] < nf]
+					# get rid of deletions that occur at last index of read
+					if len(affectedBp) and affectedBp[-1][0] == 'D' and affectedBp[-1][2] == nf-1:
+						del affectedBp[-1]
+
 
 					myCigar = ''
 					soFar = ni
@@ -1427,42 +1587,44 @@ def main():
 					OUTFQ1.write('@'+r1Name+'\n'+r1+'\n+\n'+q1+'\n')
 
 
-				#if SAVE_VCF:
-				(r1i, r1f) = (r1posMyDat, r1posMyDat+READLEN)
-				if PAIRED_END:
-					(r2i, r2f) = (r2posMyDat, r2posMyDat+READLEN)
-
+				#
+				#	Notate SNP coverage
+				#
 				for sk in relevantSNP:
 					if (sk >= r1i and sk < r1f-1):
-						snpReads[sk].append(r1NameSuffix)
-						snpCoverage[sk] += 1
-						#print (r1i,r1f), sk, snps[sk][2], chr(snps[sk][0]).upper(), '->', snps[sk][1].upper(), ',', chr(r1[snps[sk][2]-r1i+1]).upper()
-						#print r1
 
 						# if this snp is heterozygous, lets trade it out for the ref allele with it's corresponding allele balance probability
 						if sk in snpAB and random.random() < snpAB[sk]:
 							r1[sk-r1i+1] = chr(snps[sk][0]).upper()
+						# if not traded for ref allele lets count that we covered it.
+						else:
+							snpReads[sk].append(r1NameSuffix)
+							snpCoverage[sk] += 1
 							
 					elif PAIRED_END and (sk >= r2i and sk < r2f-1):
-						snpReads[sk].append(r2NameSuffix)
-						snpCoverage[sk] += 1
-						#print (r2i,r2f), sk, chr(snps[sk][0]).upper(), '->', snps[sk][1].upper(), ',', chr(r2[(READLEN-1)-(sk-r2i+1)]).upper()
-						#print r2
 
-						# het
 						if sk in snpAB and random.random() < snpAB[sk]:
 							r2[(READLEN-1)-(sk-r2i+1)] = TO_UPPER_COMP[chr(snps[sk][0])]
+						else:
+							snpReads[sk].append(r2NameSuffix)
+							snpCoverage[sk] += 1
 
+				#
+				#	Notate Indel coverage
+				#
 				for j in xrange(len(hitInds)):
-					indStart = hitInds[j][2]
-					if (indStart >= r1i and indStart < r1f-1):
-						indelCoverage[j+afwi/2] += 1
-						indelReads[j+afwi/2].append(r1NameSuffix)
-					elif PAIRED_END and (indStart >= r2i and indStart < r2f-1):
-						indelCoverage[j+afwi/2] += 1
-						indelReads[j+afwi/2].append(r2NameSuffix)
+					if hitInds[j] not in skipTheseInds:
+						indStart = hitInds[j][2]
+						if (indStart >= r1i and indStart < r1f-1):
+							indelCoverage[j+afwi/2] += 1
+							indelReads[j+afwi/2].append(r1NameSuffix)
+						elif PAIRED_END and (indStart >= r2i and indStart < r2f-1):
+							indelCoverage[j+afwi/2] += 1
+							indelReads[j+afwi/2].append(r2NameSuffix)
 
-
+				#
+				#	Write SAM file entry
+				#
 				if SAVE_SAM:
 
 					if PAIRED_END:
@@ -1528,6 +1690,9 @@ def main():
 		////////////      WRITE VCF OUTFILE      ////////////
 		//////////////////////////////////////////////////"""
 
+		print indelList
+		print indelCoverage
+
 		if SAVE_VCF:
 
 			allVariants = []
@@ -1563,6 +1728,9 @@ def main():
 						VarTargeted = ''
 						if i in indelTargeted:
 							VarTargeted = ';TARGETED=1'
+						VarAF = ''
+						if tuple(indelList[i]) in indelAB:
+							VarAF = ';AF={0:.3f}'.format(indelAB[tuple(indelList[i])])
 						VarReads = ''
 						if len(indelReads[i]) > 0:
 							VarReads = ';READS='+','.join(indelReads[i])
@@ -1572,12 +1740,12 @@ def main():
 							newStr = str(myDat[myInd:myInd+len(Svv[1])+1])
 							outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','SVTYPE=INS;END='+str(Svv[0])+';SVLEN='+str(len(Svv[1])))
 							if (int(outDat[1]),outDat[3],outDat[4]) in input_inds:
-								outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
+								outDat = (refName,str(Svv[0]),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarAF+VarReads)
 						elif idT == 'BD':
 							#print 'BigDeletion', Svv
 							outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','SVTYPE=DEL;END='+str(Svv[0]+Svv[1])+';SVLEN='+str(-Svv[1]))
 							if (int(outDat[1]),outDat[3],outDat[4]) in input_inds:
-								outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
+								outDat = (refName,str(Svv[0]),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarAF+VarReads)
 						elif idT == 'R':
 							#print 'Repeat', Svv
 							newStr = str(myDat[myInd:myInd+len(Svv[1])*Svv[2]+1])
@@ -1603,16 +1771,19 @@ def main():
 					VarTargeted = ''
 					if i in indelTargeted:
 						VarTargeted = ';TARGETED=1'
+					VarAF = ''
+					if tuple(indelList[i]) in indelAB:
+						VarAF = ';AF={0:.3f}'.format(indelAB[tuple(indelList[i])])
 					VarReads = ''
 					if len(indelReads[i]) > 0:
 						VarReads = ';READS='+','.join(indelReads[i])
 
 					if n[0] == 'D':
-						outDat = (refName,str(origInd),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
+						outDat = (refName,str(origInd),'.',str(origBase+n[4]).upper(),chr(myDat[myInd]),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarAF+VarReads)
 
 					elif n[0] == 'I':
 						newStr = str(myDat[myInd:myInd+n[1]+1])
-						outDat = (refName,str(origInd),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarReads)
+						outDat = (refName,str(origInd),'.',origBase,newStr.upper(),'.','PASS','DP='+str(indelCoverage[i])+VarTargeted+VarAF+VarReads)
 
 				if outDat != ():
 					allVariants.append(outDat)
@@ -1626,11 +1797,14 @@ def main():
 					VarTargeted = ''
 					if k in snpTargeted:
 						VarTargeted = ';TARGETED=1'
+					VarAF = ''
+					if k in snpAB:
+						VarAF = ';AF={0:.3f}'.format(snpAB[k])
 					VarReads = ''
 					if len(snpReads[k]) > 0:
 						VarReads = ';READS='+','.join(snpReads[k])
 
-					outDat = (refName,str(origInd),'.',chr(snps[k][0]).upper(),chr(myDat[spos]),'.','PASS','DP='+str(snpCoverage[k])+VarTargeted+VarReads)
+					outDat = (refName,str(origInd),'.',chr(snps[k][0]).upper(),chr(myDat[spos]),'.','PASS','DP='+str(snpCoverage[k])+VarTargeted+VarAF+VarReads)
 					#print outDat
 					allVariants.append(outDat)
 
