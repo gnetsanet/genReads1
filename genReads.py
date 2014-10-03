@@ -1690,8 +1690,6 @@ def main():
 		////////////      WRITE VCF OUTFILE      ////////////
 		//////////////////////////////////////////////////"""
 
-		print indelList
-		print indelCoverage
 
 		if SAVE_VCF:
 
