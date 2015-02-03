@@ -8,13 +8,8 @@ vcf_compare.py
 - compare vcf file produced by workflow to golden vcf produced by simulator
 
 Written by:		Zach Stephens
-Date:			February 13, 2014
+Date:			January 20, 2015
 Contact:		zstephe2@illinois.edu
-
-
-Usage:
-
-python vcf_compare.py ref.fa golden.vcf workflow.vcf
 
 ************************************************** """
 
@@ -25,30 +20,150 @@ import time
 import bisect
 import re
 import numpy as np
-#import matplotlib.pyplot as mpl
+import optparse
 
-#from misc	import histoxy, needleman_wunsch
+#
+#	mappability track functions
+#
+EIGHTBIT     = {}
+REV_EIGHTBIT = {}
+for i in xrange(256):
+	key = bytearray('\0\0\0\0\0\0\0\0')
+	if i&128: key[0] = '\1'
+	if i&64: key[1] = '\1'
+	if i&32: key[2] = '\1'
+	if i&16: key[3] = '\1'
+	if i&8: key[4] = '\1'
+	if i&4: key[5] = '\1'
+	if i&2: key[6] = '\1'
+	if i&1: key[7] = '\1'
+	EIGHTBIT[str(key)]   = chr(i)
+	REV_EIGHTBIT[chr(i)] = key
 
-SAMTOOLS_EXEC = '/Users/zach/Desktop/bioinformatics_stuff/samtools'
+def compressTrack(t):
+	len_t = len(t)
+	padded = len_t-(len_t%8)+8
+	while len(t) != padded:
+		t.append('\0')
+	outStr = ''
+	for i in xrange(0,padded,8):
+		outStr += EIGHTBIT[str(t[i:i+8])]
+	return (len_t,outStr.encode("zlib"))
 
-EV_BPRANGE = 20		# how far to either side of a particular variant location do we want to check for equivalents?
-RR_BPRANGE = 70		# how far to either side of a particular variant location do we want to check for region repeats?
+def decompressTrack(ct):
+	outBA = bytearray()
+	dc = ct[1].decode("zlib")
+	for i in xrange(len(dc)):
+		outBA.extend(REV_EIGHTBIT[dc[i]])
+	return outBA[:ct[0]]
+#
+#
+#
 
-RR_THRESH  = RR_BPRANGE/4
+EV_BPRANGE = 50		# how far to either side of a particular variant location do we want to check for equivalents?
 
 DEFAULT_QUAL = -666
 
+DESC   = """%prog: vcf comparison script."""
+VERS   = 0.1
+
+PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -g <golden.vcf> -w <workflow.vcf>',description=DESC,version="%prog v"+str(VERS))
+
+PARSER.add_option('-r', help='* Reference Fasta',   dest='REFF', action='store', metavar='<ref.fa>')
+PARSER.add_option('-g', help='* Golden VCF',        dest='GVCF', action='store', metavar='<golden.vcf>')
+PARSER.add_option('-w', help='* Workflow VCF',      dest='WVCF', action='store', metavar='<workflow.vcf>')
+PARSER.add_option('-m', help='Mappability Track', dest='MTRK', action='store', metavar='<tracks.dat>')
+PARSER.add_option('-t', help='Targetted Regions', dest='TREG', action='store', metavar='<regions.bed>')
+PARSER.add_option('-T', help='Min Region Len',    dest='MTRL', action='store', metavar='<int>')
+
+PARSER.add_option('--no-plot', help="No plotting [%default]", dest='NO_PLOT', default=False, action='store_true')
+
+(OPTS,ARGS) = PARSER.parse_args()
+
+REFERENCE    = OPTS.REFF
+GOLDEN_VCF   = OPTS.GVCF
+WORKFLOW_VCF = OPTS.WVCF
+MAPTRACK     = OPTS.MTRK
+BEDFILE      = OPTS.TREG
+NO_PLOT      = OPTS.NO_PLOT
+if OPTS.MTRL != None:
+	MINREGIONLEN = int(OPTS.MTRL)
+else:
+	MINREGIONLEN = None
+
+if REFERENCE == None:
+	print 'Error: No reference provided.'
+	exit(1)
+if GOLDEN_VCF == None:
+	print 'Error: No golden VCF provided.'
+	exit(1)
+if WORKFLOW_VCF == None:
+	print 'Error: No workflow VCF provided.'
+	exit(1)
+if (BEDFILE != None and MINREGIONLEN == None) or (BEDFILE == None and MINREGIONLEN != None):
+	print 'Error: Both -t and -T must be specified'
+	exit(1)
+
+if NO_PLOT == False:
+	import matplotlib.pyplot as mpl
+	from matplotlib_venn import venn2, venn3
+
+AF_STEPS = 20
+AF_KEYS  = np.linspace(0.0,1.0,AF_STEPS+1)
+
+def quantize_AF(af):
+	if af >= 1.0:
+		return AF_STEPS
+	elif af <= 0.0:
+		return 0
+	else:
+		return int(af*AF_STEPS)
+
+def parseLine(splt):
+
+	cov  = None
+	af   = 1.0
+	qual = DEFAULT_QUAL
+	alt_alleles = []
+
+	#	any alt alleles?
+	alt_split = splt[4].split(',')
+	if len(alt_split) > 1:
+		alt_alleles = alt_split
+
+	#	do we have the necessary fields to compute DP/AF stats?
+	if len(splt) >= 8:
+
+		#	get variant coverage
+		#
+		if 'DP=' in splt[7]:
+			cov = int(re.findall(r"DP=[0-9]+",splt[7])[0][3:])
+		# check for different formatting
+		elif len(splt) >= 9:
+			if ':DP' in splt[8] or 'DP:' in splt[8]:
+				dpInd = splt[8].split(':').index('DP')
+				cov   = int(splt[9].split(':')[dpInd])
+
+		#	get variant AF (for heterozygous genotypes)
+		#
+		af = 1.0
+		if 'AF=' in splt[7]:
+			af  = float(re.findall(r"AF=.*?(?=;)",splt[7])[0][3:])
+		# check for different formatting
+		elif len(splt) >= 9:
+			if ':AF' in splt[8] or 'AF:' in splt[8]:
+				afInd = splt[8].split(':').index('AF')
+				af    = float(splt[9].split(':')[afInd])
+
+		#	get variant call quality
+		#
+		if splt[5] != '.':
+			qual = float(splt[5])
+
+	return (cov, af, qual, alt_alleles)
+
+
 def main():
-
-	if len(sys.argv) != 4 and len(sys.argv) != 6:
-		print '\nUsage:\n\npython vcf_compare.py ref.fa golden.vcf workflow.vcf\n'
-		print 'OR:'
-		print '\nUsage:\n\npython vcf_compare.py ref.fa golden.vcf workflow.vcf targetedRegions.bed minRegionLen\n'
-		exit(1)
-
-	GOLDEN_VCF   = sys.argv[2]
-	WORKFLOW_VCF = sys.argv[3]
-	REFERENCE    = sys.argv[1]
 
 	ref = []
 	f = open(REFERENCE,'r')
@@ -69,10 +184,6 @@ def main():
 			prevP = f.tell()
 			prevR = data[1:-1]
 
-	if len(sys.argv) == 6:
-		BEDFILE  = sys.argv[4]
-	else:
-		BEDFILE  = None
 	ztV = 0
 	znP = 0
 	zfP = 0
@@ -81,6 +192,46 @@ def main():
 	if BEDFILE != None:
 		zbM = 0
 
+	mappability_vs_FN = {0:0, 1:0}	# [0] = # of FNs that were in mappable regions, [1] = # of FNs that were in unmappable regions
+	coverage_vs_FN    = {}			# [C] = # of FNs that were covered by C reads
+	alleleBal_vs_FN   = {}			# [AF] = # of FNs that were heterozygous genotypes with allele freq AF (quantized to multiples of 1/AF_STEPS)
+	for n in AF_KEYS:
+		alleleBal_vs_FN[n] = 0
+
+	#
+	#	read in mappability track
+	#
+	mappability_tracks = {}
+	if MAPTRACK != None:
+		print 'reading mappability tracks...'
+		mapf = open(MAPTRACK,"rb")
+		[headerLen] = np.fromfile(mapf,'<i4',1)
+		header = mapf.read(headerLen)
+		names  = []
+		lens   = []
+		bytes  = []
+		for line in header.split('\n')[:-1]:
+			splt = line.split('\t')
+			names.append(splt[0])
+			lens.append(int(splt[1]))
+			bytes.append(int(splt[2]))
+
+		for i in xrange(len(names)):
+			mappability_tracks[names[i]] = decompressTrack((lens[i],mapf.read(bytes[i])))
+
+	#
+	#	data for plotting FN analysis
+	#
+	set1 = []
+	set2 = []
+	set3 = []
+	varAdj = 0
+
+	#
+	#
+	#	For each sequence in reference fasta...
+	#
+	#
 	for n_RI in ref_inds:
 		refName = n_RI[0]
 		# assumes fasta file is sane and has '\n' characters within long sequences
@@ -106,26 +257,28 @@ def main():
 		myDat = bytearray(''.join(myDat)).upper()
 		myLen = len(myDat)
 
-		""" **************************************** """
-
+		#
+		#	Parse relevant targeted regions
+		#
 		targRegionsFl = []
-		if len(sys.argv) == 6:
+		if BEDFILE != None:
 			bedfile = open(BEDFILE,'r')
-			minRegionLen = int(sys.argv[5])
 			for line in bedfile:
 				splt = line.split('\t')
 				if splt[0] == refName:
 					targRegionsFl.extend((int(splt[1]),int(splt[2])))
 			bedfile.close()
 		else:
-			BEDFILE  = None
 			targRegionsFl = [-1,myLen+1]
 
-
+		#
+		#	Parse relevant golden variants
+		#
 		correctVariants = []
 		correctHashed   = {}
 		correctCov      = {}
-		correctReads    = {}
+		correctAF       = {}
+		correctQual     = {}
 		correctTargLen  = {}
 		nBelowMinRLen   = 0
 		for line in open(GOLDEN_VCF,'r'):
@@ -137,28 +290,24 @@ def main():
 
 					if targInd%2 == 1:
 						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
-						if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
+						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 							correctVariants.append(var)
 							correctHashed[var] = 1
-							cov = 0
-							if 'DP=' in splt[7]:
-								cov = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
-							else:
-								# check for different formatting
-								if ':DP' in splt[8] or 'DP:' in splt[8]:
-									dpInd = splt[8].split(':').index('DP')
-									cov   = int(splt[9].split(':')[dpInd])
-							correctCov[var] = cov
-							if 'READS=' in splt[7]:
-								rstrings = re.findall(r"(READS=.*?)(?=;)",splt[7]) + re.findall(r"(READS=.*?)(?=\n)",splt[7])
-								correctReads[var] = ''.join([m[6:] for m in rstrings]).split(',')
+							
+							(cov, af, qual, aa) = parseLine(splt)
+
+							correctCov[var]     = cov
+							correctAF[var]      = af
+							correctQual[var]    = qual
 							correctTargLen[var] = targLen
 						else:
 							nBelowMinRLen += 1
 
-		#print correctVariants
-
+		#
+		#	Parse relevant workflow variants
+		#
 		workflowVariants = []
+		workflow_alts    = {}
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
 				splt = line.split('\t')
@@ -168,40 +317,49 @@ def main():
 
 					if targInd%2 == 1:
 						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
-						if (BEDFILE != None and targLen >= minRegionLen) or BEDFILE == None:
-							if splt[5] == '.':
-								qual = DEFAULT_QUAL
-							else:
-								qual = float(splt[5])
-							cov = 0
-							if 'DP=' in splt[7]:
-								cov  = int(re.findall(r"DP=[0-999999]",splt[7])[0][3:])
-							else:
-								# check for different formatting
-								if ':DP' in splt[8] or 'DP:' in splt[8]:
-									dpInd = splt[8].split(':').index('DP')
-									cov   = int(splt[9].split(':')[dpInd])
-							workflowVariants.append([var,[qual,cov,targLen]])
+						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
+							
+							(cov, af, qual, aa) = parseLine(splt)
 
+							if len(aa):
+								allVars = [(var[0],var[1],n) for n in aa]
+								for i in xrange(len(allVars)):
+									workflowVariants.append([allVars[i],[cov,af,qual,targLen]])
+									workflow_alts[allVars[i]] = allVars
+							else:
+								workflowVariants.append([var,[cov,af,qual,targLen]])
+
+		#
+		#	Deduce which variants are FP / FN
+		#
 		nPerfect = 0
 		FPvariants = []
+		alts_to_ignore = []
 		for [var,extraInfo] in workflowVariants:
 			if var in correctHashed:
 				nPerfect += 1
 				correctHashed[var] = 2
+				if var in workflow_alts:
+					alts_to_ignore.extend(workflow_alts[var])
 			else:
 				FPvariants.append([var,extraInfo])
+
+		#	remove any trace of variants who was not found, but whose alternate was
+		for i in xrange(len(FPvariants)-1,-1,-1):
+			if FPvariants[i][0] in alts_to_ignore:
+				del FPvariants[i]
 		
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
-		print len(notFound), len(FPvariants)
+		#print len(notFound), len(FPvariants)
 
 		totalVariants = nPerfect + len(notFound)
 		if totalVariants == 0:
 			zfP += len(FPvariants)
 			continue
 
-
-		# let's check for equivalent variants
+		#
+		#	let's check for equivalent variants
+		#
 		delList_i = []
 		delList_j = []
 		regionsToCheck = []
@@ -258,6 +416,9 @@ def main():
 			nEquiv += 1
 		nPerfect += nEquiv
 
+		#
+		#	Tally up errors and whatnot
+		#
 		ztV += totalVariants
 		znP += nPerfect
 		zfP += len(FPvariants)
@@ -266,9 +427,77 @@ def main():
 		if BEDFILE != None:
 			zbM += nBelowMinRLen
 
-		#break
+		#
+		#	try to identify a reason for FN variants:
+		#
+		avg_dp = np.mean(correctCov.values())
+		std_dp = np.std(correctCov.values())
+
+		DP_THRESH = avg_dp - 2 * std_dp		# below this is unusually low
+		AF_THRESH = 0.7						# below this is a het variant with potentially low allele balance
+
+		venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
+
+		for i in xrange(len(notFound)):
+			var = notFound[i]
+
+			#	mappability?
+			if MAPTRACK != None:
+				if mappability_tracks[refName][var[0]]:
+					mappability_vs_FN[1] += 1
+					venn_data[i][0] = 1
+				else:
+					mappability_vs_FN[0] += 1
+
+			#	coverage?
+			if var in correctCov:
+				c = correctCov[var]
+				if c not in coverage_vs_FN:
+					coverage_vs_FN[c] = 0
+				coverage_vs_FN[c] += 1
+				if c < DP_THRESH:
+					venn_data[i][1] = 1
+
+			#	heterozygous genotype messing things up?
+			if var in correctAF:
+				a = AF_KEYS[quantize_AF(correctAF[var])]
+				if a not in alleleBal_vs_FN:
+					alleleBal_vs_FN[a] = 0
+				alleleBal_vs_FN[a] += 1
+				if a < AF_THRESH:
+					venn_data[i][2] = 1
+
+		for i in xrange(len(notFound)):
+			if venn_data[i][0]: set1.append(i+varAdj)
+			if venn_data[i][1]: set2.append(i+varAdj)
+			if venn_data[i][2]: set3.append(i+varAdj)
+		varAdj += len(notFound)
+
+	#
+	#	plot some FN stuff
+	#
+	if NO_PLOT == False:
+		nDetected = len(set(set1+set2+set3))
+		set1 = set(set1)
+		set2 = set(set2)
+		set3 = set(set3)
+
+		mpl.figure(0)
+		tstr1 = 'False Negative Variants (Missed Detections)'
+		tstr2 = str(nDetected)+' / '+str(znF)+' FN variants categorized'
+		if MAPTRACK != None:
+			v = venn3([set1, set2, set3], ('Unmappable', 'Low Coverage', 'Heterozygous'))
+		else:
+			v = venn2([set2, set3], ('Low Coverage', 'Heterozygous'))
+		mpl.figtext(0.5,0.95,tstr1,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
+		mpl.figtext(0.5,0.03,tstr2,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
+
+		mpl.show()
 
 
+	#
+	#	spit out results to console
+	#
 	print '\n**********************************\n'
 	if BEDFILE != None:
 		print 'ONLY CONSIDERING VARIANTS FOUND WITHIN TARGETED REGIONS\n\n'
@@ -276,71 +505,22 @@ def main():
 	print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
 	print 'FP variants:   ',zfP,'({0:.2f}%)'.format(100.*float(zfP)/ztV)
 	print 'FN variants:   ',znF,'({0:.2f}%)'.format(100.*float(znF)/ztV)
-	print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
+	#print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
 	if BEDFILE != None:
 		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',zbM
 	print '\n**********************************\n'
 
-
-	"""
-	# check if repeats are responsible for any pair of FN / FP variants
-	potential_pairs = []
-	delList_i = []
-	delList_j = []
-	for i in xrange(len(FPvariants)):
-		pos = FPvariants[i][0][0]
-		roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
-		refSection1 = myDat[roi[0]:roi[1]]
-	
-		for j in xrange(len(notFound)):
-			if (FPvariants[i][0][1],FPvariants[i][0][2]) == (notFound[j][1],notFound[j][2]):
-				pos = notFound[j][0]
-				roi = (max([pos-RR_BPRANGE-1,0]),min([pos+RR_BPRANGE,len(myDat)-1]))
-				refSection2 = myDat[roi[0]:roi[1]]
-	
-				(score,a1,a2) = needleman_wunsch(1, 1, str(refSection1), str(refSection2))
-				if score <= RR_THRESH:
-					potential_pairs.append((i,j,score))
-					delList_i.append(i)
-					delList_j.append(j)
-
-	print 'Pairs of variants that originated from within one instance of a repetitive region, but were called by the workflow in another because the reads from the original region were confidently mapped elsewhere:',len(potential_pairs),'\n'
-	for n in potential_pairs:
-		print 'golden:\t\t',notFound[n[1]]
-		print 'workflow:\t',FPvariants[n[0]]
-		print 'NW_score:\t',n[2]
-	print '\n**********************************\n'
-
-	for i in sorted(list(set(delList_i)),reverse=True):
-		del FPvariants[i]
-	for j in sorted(list(set(delList_j)),reverse=True):
-		del notFound[j]
-
-	
-
-	########################################################
-
-
-
-	for n in FPvariants:
-		print n
-	print '\n**********************************\n'
-
-	for n in notFound:
-		print n,
-		#if n in correctReads:
-		#	for roi in correctReads[n]:
-		#		print roi
-		#	die
-		if n in correctCov:
-			print 'DP =',correctCov[n],
-			if BEDFILE != None:
-				print 'TL =',correctTargLen[n]
-			else:
-				print ''
-		else:
-			print ''
-	"""
+	#if MAPTRACK != None:
+	#	print 'mappability:'
+	#	print mappability_vs_FN
+	#
+	#print 'coverage:'
+	#for k in sorted(coverage_vs_FN.keys()):
+	#	print k,':',coverage_vs_FN[k]
+	#
+	#print 'allele balance:'
+	#for k in sorted(alleleBal_vs_FN.keys()):
+	#	print k,':',alleleBal_vs_FN[k]
 
 
 if __name__ == '__main__':

@@ -31,6 +31,7 @@ SIM_PATH         = '/'.join(os.path.realpath(__file__).split('/')[:-1])+'/'
 
 sys.path.append(SIM_PATH)
 from misc	import *
+from sequencingErrors	import SequencingErrors
 
 
 """//////////////////////////////////////////////////
@@ -39,7 +40,7 @@ from misc	import *
 
 
 DESC   = """%prog: Variant and read simulator for benchmarking NGS workflows."""
-VERS   = 0.1
+VERS   = 0.2
 
 DEFAULT_COV = 10.							# default average coverage value
 DEFAULT_RNG = None							# default RNG seed
@@ -213,9 +214,8 @@ INDEL_MUT  = [.00015,.00002,.00001,.000005,.000002]
 MAX_INDEL  = len(INDEL_MUT)
 # probability of any indel occuring
 INDEL_FREQ = sum(INDEL_MUT)
-# if an indel occurs, what are the odds it's an insertion vs. deletion?
+# if an indel occurs, what are the odds it's an insertion as opposed to a deletion?
 INS_FREQ   = 0.25
-DEL_FREQ   = 1.-INS_FREQ
 # how do the nucleotides mutate into eachother if a SNP occurs?
 SNP_MUT    = [[0.,   0.15,  0.70,  0.15],
 		      [0.15, 0.,    0.15,  0.70],
@@ -243,6 +243,13 @@ if OPTS.SSM == DEFAULT_SSM:
 	SSE_MODEL = SIM_PATH+DEFAULT_SSM
 else:
 	SSE_MODEL = OPTS.SSM
+
+# if a sequencing error occurs, what are the odds it's an indel?
+SIE_RATE = 0.01
+# if a sequencing indel error occurs, what are the odds it's an insertion as opposed to a deletion?
+SIE_INS_FREQ = 0.4
+# if a sequencing insertion error occurs, what's the probability of it being an A, C, G, T...
+SIE_NUCL = [0.25, 0.25, 0.25, 0.25]
 
 
 """////////////////////////////////////////////////
@@ -374,9 +381,13 @@ def main():
 			cpSSE[i][j] = cpSSE[i][j]+cpSSE[i][j-1]
 	#print cpSSE
 
-	# create cumulative probability lists for allele balance
+	# create cumulative probability list for allele balance
 	cpAB = np.cumsum(AB_PROB).tolist()[:-1]
 	cpAB.insert(0,0.)
+
+	# create cumulative probability list for sequencing insertion error nucleotide
+	cpSIE = np.cumsum(SIE_NUCL).tolist()[:-1]
+	cpSIE.insert(0,0.)
 
 	# load empirical quality score distributions
 	[allPMFs,probQ,Qscores,qOffset] = pickle.load(open(QSCORE_MODEL,'rb'))
@@ -482,6 +493,9 @@ def main():
 	cpFrag = [float(n)/sum(FRAGPROB) for n in FRAGPROB]
 	cpFrag = np.cumsum(cpFrag).tolist()[:-1]
 	cpFrag.insert(0,0.)
+
+	# initialize class used to introduce sequencing errors
+	seqErrObj = SequencingErrors(READLEN, cpSSE, cpSIE, SIE_RATE, SIE_INS_FREQ)
 
 
 	"""//////////////////////////////////////////////////////
@@ -973,7 +987,10 @@ def main():
 		for i in xrange(len(input_snps)):
 			n = input_snps[i]
 			spos = n[0]-1
-			spos -= addThis[bisect.bisect(afterThis,spos)]
+			sind = bisect.bisect(afterThis,spos)
+			if sind == len(afterThis):
+				sind -= 1
+			spos -= addThis[sind]
 
 			#print n, spos, chr(myDat[spos])
 			if spos not in snps and chr(myDat[spos]).upper() == n[1]:
@@ -1200,18 +1217,6 @@ def main():
 			jobReadCount = 0
 			for j in n:
 
-				#if INPUT_BED == None:
-				#	bi = j*windowShift
-				#	bf = j*windowShift+COV_WINDOW
-				#	if j == len(targetCov)-1:
-				#		if i == JOB_ID-1:
-				#			myJobReadsToAdd.append(0)
-				#		continue
-				#	elif j == len(targetCov)-2:
-				#		bf = myLen
-				#else:
-				#	(bi,bf) = targetRegionsToSample[j]
-
 				(bi,bf) = targetRegionsToSample[j]
 
 				currentLen = bf-bi
@@ -1295,7 +1300,6 @@ def main():
 				q1 = bytearray([DUMMY_QSCORE+qOffset]*READLEN)
 			q2 = q1
 		nReads = 0
-		nSeqSubErr = 0
 		PRINT_EVERY_PERCENT = 5
 		totalProgress       = PRINT_EVERY_PERCENT
 		for i in xrange(len(myJobRegions)):
@@ -1312,13 +1316,13 @@ def main():
 
 			if len(indelList) == 0:
 				relevantAT = []
-				hitInds    = []
+				wHitInds    = []
 				afwi = 0
 			else:
 				afwi = bisect.bisect(afterThis,bi-MAX_INDEL)
 				afwf = bisect.bisect(afterThis,bf+MAX_INDEL)
 				relevantAT = afterThis[afwi:afwf]
-				hitInds    = indelList[afwi/2:min([afwf/2,len(indelList)])]
+				wHitInds    = indelList[afwi/2:min([afwf/2,len(indelList)])]
 			if len(snpKeys) == 0:
 				relevantSNP = []
 				snpi = 0
@@ -1329,6 +1333,7 @@ def main():
 
 			for rta in xrange(readsToAdd):
 
+				hitInds = [n for n in wHitInds]
 				if PAIRED_END:
 					fl = FRAGLEN[randEvent(cpFrag)]
 					n0 = random.randint(0,len(currentDat)-fl-1)
@@ -1340,63 +1345,60 @@ def main():
 					r1posMyDat = bi+n0+1
 
 
+				#
 				# readData
+				#
 				r1 = bytearray(currentDat[n0:n0+READLEN])
 				if PAIRED_END:
 					r2 = bytearray(currentDatRC[revoff:revoff+READLEN])
 
-				# quality scores
+				# re-init seqErrObj
 				if PAIRED_END:
-					if SEQUENCING_QSCORES:
-						q1 = bytearray()
+					seqErrObj.newReads(r1posMyDat,r2posMyDat)
+				else:
+					seqErrObj.newReads(r1posMyDat)
+
+				#
+				# quality scores
+				#
+				if SEQUENCING_QSCORES:
+					q1 = bytearray()
+					q1.append(randEvent(initQProb)+qOffset)
+					if PAIRED_END:
 						q2 = bytearray()
-						q1.append(randEvent(initQProb)+qOffset)
 						q2.append(randEvent(initQProb)+qOffset)
-						for j in xrange(1,READLEN):
-							qscore1 = randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset
+					for j in xrange(1,READLEN):
+						qscore1 = randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset
+						q1.append(qscore1)
+						if PAIRED_END:
 							qscore2 = randEvent(allQscoreCumProb[j*nQscores+q2[j-1]])+qOffset
-							q1.append(qscore1)
 							q2.append(qscore2)
 
-							# introduce sequencing substitution errors based on their quality score
-							if SEQUENCING_SNPS:
-								if random.random() < pError[qscore1]:
-									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
-									nSeqSubErr += 1
-								if random.random() < pError[qscore2]:
-									r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
-									nSeqSubErr += 1
-					else:
-						# if no q-scores, introduce sequencing substitution based on desired average frequency
-						if SEQUENCING_SNPS:
-							for j in xrange(READLEN):
-								if random.random() < positionSSErate[j]:
-									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
-									nSeqSubErr += 1
-								if random.random() < positionSSErate[j]:
-									r2[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r2[j]]])]
-									nSeqSubErr += 1
-
-				# single-end reads. (ewww code copy-pasting, I'm sorry..)
+					#
+					# introduce sequencing errors based on quality scores
+					#
+					if SEQUENCING_SNPS:
+						for j in xrange(READLEN):
+							if random.random() < pError[q1[j]]:
+								seqErrObj.introduceError(1, r1, j)
+							if PAIRED_END and random.random() < pError[q2[j]]:
+								seqErrObj.introduceError(2, r2, j)
 				else:
-					if SEQUENCING_QSCORES:
-						q1 = bytearray()
-						q1.append(randEvent(initQProb)+qOffset)
-						for j in xrange(1,READLEN):
-							qscore1 = randEvent(allQscoreCumProb[j*nQscores+q1[j-1]])+qOffset
-							q1.append(qscore1)
-							if SEQUENCING_SNPS:
-								if random.random() < pError[qscore1]:
-									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
-									nSeqSubErr += 1
-					else:
-						if SEQUENCING_SNPS:
-							for j in xrange(READLEN):
-								if random.random() < positionSSErate[j]:
-									r1[j] = NUM_NUCL[randEvent(cpSSE[NUCL_NUM[r1[j]]])]
-									nSeqSubErr += 1
+					#
+					# if no q-scores, introduce sequencing errors based on desired average frequency (with moderate positional preference towards end of read)
+					#
+					if SEQUENCING_SNPS:
+						for j in xrange(READLEN):
+							if random.random() < positionSSErate[j]:
+								seqErrObj.introduceError(1, r1, j)
+							if PAIRED_END and random.random() < positionSSErate[j]:
+								seqErrObj.introduceError(2, r2, j)
 
 
+				# append sequencing indel errors to list of variation we need to consider for these reads
+				hitInds.extend(seqErrObj.myHitInds)
+
+				# oragnize some variable in preparation for constructing cigar strings and shifting read positions to account for variants
 				cigarsAndAdjustedPos = []
 				if PAIRED_END:
 					rtt = [r1posMyDat,r2posMyDat]
@@ -1410,16 +1412,14 @@ def main():
 				
 				#
 				# if indel is heterozygous, lets trade it out for the ref allele and remove it from cigar-string computations (with corresponding allele balance probability of course)
-				#print 'read #:',str(nReads+myJobOffset+bigReadNameOffset)+'/1'
-				#print (r1i, r1f)
-				#print 'hitInds:', hitInds
+				#
 				skipTheseInds = []
 				adjustedVariants = {tuple(n):0 for n in hitInds}
 				for j in xrange(len(hitInds)):
 					thij     = tuple(hitInds[j])
 					adj      = adjustedVariants[thij]
 					indStart = thij[2]
-					if thij in indelAB and random.random() < indelAB[thij]:
+					if (thij in indelAB and random.random() < indelAB[thij]) or (hitInds[j] in seqErrObj.sie_errors):
 						#print ''
 						#print hitInds[j]
 						#print (r1i,r1f),(r2i,r2f),indStart
@@ -1484,7 +1484,8 @@ def main():
 						else:
 							continue
 
-						skipTheseInds.append(hitInds[j])
+						if hitInds[j] not in seqErrObj.sie_errors:
+							skipTheseInds.append(hitInds[j])
 
 				for rp in rtt:
 					# I want to get nucleotides 'ni' to 'nf' from our modified reference and get the
@@ -1492,7 +1493,7 @@ def main():
 					ni = rp
 					nf = rp+READLEN		# ni + READLEN
 
-					if len(relevantAT) == 0:
+					if len(relevantAT) == 0 and len(seqErrObj.sie_errors) == 0:
 						if len(indelList) > 0:
 							if afwi == len(addThis):
 								ni += addThis[-1]
@@ -1519,8 +1520,20 @@ def main():
 					#if indelList[bpf][2]+1 < nf:
 					#	affectedBp.append(indelList[bpf])
 
+					# insert sequencing indel errors to the list of indels that affect the bp in our read
+					for n in seqErrObj.sie_errors:
+						if n[0] == 'I':
+							n = ['D',n[1],n[2],n[2]+1,n[4]]
+						elif n[0] == 'D':
+							n = ['I',n[1],n[2],n[2]+n[1]+1,n[4]]
+						affectedBp.append(n)
+					affectedBp.sort(key=lambda x: int(x[2]))
+
 					# take out indels if this read is heterozygous and has ref allele instead
 					affectedBp = [n for n in affectedBp if n not in skipTheseInds]
+					if len(seqErrObj.sie_errors):
+						print 'read #:',str(nReads+myJobOffset+bigReadNameOffset)+'/1'
+						print 'affectedBp:',affectedBp
 					# adjust indel offsets of variants following hets that have ref instead
 					for i in xrange(len(affectedBp)):
 						tabi = tuple(affectedBp[i])
@@ -1612,6 +1625,9 @@ def main():
 				#
 				#	Notate Indel coverage
 				#
+				for j in xrange(len(hitInds)-1,-1,-1):	# remove SIE errors
+					if hitInds[j] in seqErrObj.sie_errors:
+						del hitInds[j]
 				for j in xrange(len(hitInds)):
 					if hitInds[j] not in skipTheseInds:
 						indStart = hitInds[j][2]
@@ -1683,7 +1699,8 @@ def main():
 
 		print '\n',nReads,'(reads)','{0:.3f} (sec),'.format(time.time()-tt),int((nReads*READLEN)/(time.time()-tt)),'(bp/sec)'
 		if nReads > 0:
-			print 'SSE rate:',float(nSeqSubErr)/(nReads*READLEN)
+			print 'SSE rate:',float(seqErrObj.numSSE_total)/(nReads*READLEN)
+			print 'SIE rate:',float(seqErrObj.numSIE_total)/(nReads*READLEN)
 
 
 		"""//////////////////////////////////////////////////
@@ -1919,8 +1936,8 @@ def main():
 		rfOut.write('Total Runtime:\t'+str(int(finalTime))+' sec\n\n')
 		#rfOut.write('Rate:\t\t\t'+printBasesNicely(int(float(bigReadNameOffset*READLEN)/finalTime+0.5))+'/sec\n\n')
 		rfOut.write('Variants Introduced:\n')
-		rfOut.write('\t- '+str(totalSNPs)+' SNPs\n')
-		rfOut.write('\t- '+str(totalInds)+' small indels (length 1-'+str(MAX_INDEL)+')\n')
+		rfOut.write('\t- '+str(totalSNPs)+' SNPs, ['+str(len(snpAB))+' hets]\n')
+		rfOut.write('\t- '+str(totalInds)+' small indels (length 1-'+str(MAX_INDEL)+') ['+str(len(indelAB))+' hets]\n')
 		rfOut.write('\t- '+str(totalSTVs)+' SVs\n')
 
 		rfOut.close()
