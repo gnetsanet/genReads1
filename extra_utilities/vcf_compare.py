@@ -177,7 +177,7 @@ def main():
 	prevR = None
 	prevP = None
 	ref_inds = []
-	sys.stdout.write('\nindexing reference fasta...')
+	sys.stdout.write('\nindexing reference fasta... ')
 	sys.stdout.flush()
 	tt = time.time()
 	while 1:
@@ -288,7 +288,7 @@ def main():
 		#
 		#	It begins...
 		#
-		sys.stdout.write('comparing variation in '+refName+'...')
+		sys.stdout.write('comparing variation in '+refName+'... ')
 		sys.stdout.flush()
 		tt = time.time()
 
@@ -455,8 +455,9 @@ def main():
 		#
 		#	try to identify a reason for FN variants:
 		#
-		avg_dp = np.mean(correctCov.values())
-		std_dp = np.std(correctCov.values())
+		if len(correctCov):
+			avg_dp = np.mean(correctCov.values())
+			std_dp = np.std(correctCov.values())
 
 		DP_THRESH = avg_dp - 2 * std_dp		# below this is unusually low
 		AF_THRESH = 0.7						# below this is a het variant with potentially low allele balance
@@ -537,6 +538,8 @@ def main():
 		print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
 	if BEDFILE != None:
 		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',zbM
+	if FAST == False:
+		print "\nWarning! Running with '--fast' means that identical variants denoted differently between the two vcfs will not be detected! The values above may be lower than the true accuracy."
 	print '\n**********************************\n'
 
 	#if MAPTRACK != None:
