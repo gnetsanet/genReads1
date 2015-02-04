@@ -377,6 +377,7 @@ def main():
 		totalVariants = nPerfect + len(notFound)
 		if totalVariants == 0:
 			zfP += len(FPvariants)
+			print '{0:.3f} (sec)'.format(time.time()-tt)
 			continue
 
 		#
@@ -497,7 +498,6 @@ def main():
 			if venn_data[i][2]: set3.append(i+varAdj)
 		varAdj += len(notFound)
 
-		print 'RAWRRRRRRRR'
 		print '{0:.3f} (sec)'.format(time.time()-tt)
 
 	#
