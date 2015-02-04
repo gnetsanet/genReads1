@@ -120,7 +120,6 @@ def quantize_AF(af):
 		return int(af*AF_STEPS)
 
 def parseLine(splt):
-	print splt
 
 	cov  = None
 	af   = 1.0
@@ -141,7 +140,8 @@ def parseLine(splt):
 			cov = int(re.findall(r"DP=[0-9]+",splt[7])[0][3:])
 		# check for different formatting
 		elif len(splt) >= 9:
-			if ':DP' in splt[8] or 'DP:' in splt[8]:
+			splt[8] += ':'
+			if ':DP:' in splt[8]:
 				dpInd = splt[8].split(':').index('DP')
 				cov   = int(splt[9].split(':')[dpInd])
 
@@ -152,7 +152,8 @@ def parseLine(splt):
 			af  = float(re.findall(r"AF=.*?(?=;)",splt[7])[0][3:])
 		# check for different formatting
 		elif len(splt) >= 9:
-			if ':AF' in splt[8] or 'AF:' in splt[8]:
+			splt[8] += ':'
+			if ':AF:' in splt[8]:
 				afInd = splt[8].split(':').index('AF')
 				af    = float(splt[9].split(':')[afInd])
 
@@ -297,7 +298,8 @@ def main():
 							
 							(cov, af, qual, aa) = parseLine(splt)
 
-							correctCov[var]     = cov
+							if cov != None:
+								correctCov[var]     = cov
 							correctAF[var]      = af
 							correctQual[var]    = qual
 							correctTargLen[var] = targLen
