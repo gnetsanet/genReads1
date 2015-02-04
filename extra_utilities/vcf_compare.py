@@ -177,7 +177,8 @@ def main():
 	prevR = None
 	prevP = None
 	ref_inds = []
-	print 'indexing reference fasta...',
+	sys.stdout.write('\nindexing reference fasta...')
+	sys.stdout.flush()
 	tt = time.time()
 	while 1:
 		nLines += 1
@@ -253,9 +254,9 @@ def main():
 			myDat  = f.read(n_RI[2]-n_RI[1]).split('\n')
 			myLen  = sum([len(m) for m in myDat])
 			if sys.version_info >= (2,7):
-				print '{:,} bp\n'.format(myLen)
+				print '{:,} bp'.format(myLen)
 			else:
-				print '{0:} bp\n'.format(myLen)
+				print '{0:} bp'.format(myLen)
 			inWidth = len(myDat[0])
 			if len(myDat[-1]) == 0:	# if last line is empty, remove it.
 				del myDat[-1]
@@ -283,6 +284,13 @@ def main():
 			bedfile.close()
 		else:
 			targRegionsFl = [-1,MAX_VAL+1]
+
+		#
+		#	It begins...
+		#
+		sys.stdout.write('\ncomparing variation in '+refName+'...')
+		sys.stdout.flush()
+		tt = time.time()
 
 		#
 		#	Parse relevant golden variants
@@ -487,6 +495,8 @@ def main():
 			if venn_data[i][1]: set2.append(i+varAdj)
 			if venn_data[i][2]: set3.append(i+varAdj)
 		varAdj += len(notFound)
+
+		print '{0:.3f} (sec)'.format(time.time()-tt)
 
 	#
 	#	plot some FN stuff
