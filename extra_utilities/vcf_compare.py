@@ -493,11 +493,11 @@ def main():
 					if a < AF_THRESH:
 						venn_data[i][2] = 1
 
-		for i in xrange(len(notFound)):
-			if venn_data[i][0]: set1.append(i+varAdj)
-			if venn_data[i][1]: set2.append(i+varAdj)
-			if venn_data[i][2]: set3.append(i+varAdj)
-		varAdj += len(notFound)
+			for i in xrange(len(notFound)):
+				if venn_data[i][0]: set1.append(i+varAdj)
+				if venn_data[i][1]: set2.append(i+varAdj)
+				if venn_data[i][2]: set3.append(i+varAdj)
+			varAdj += len(notFound)
 
 		print '{0:.3f} (sec)'.format(time.time()-tt)
 
