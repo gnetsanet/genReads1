@@ -62,7 +62,9 @@ def decompressTrack(ct):
 
 EV_BPRANGE = 50		# how far to either side of a particular variant location do we want to check for equivalents?
 
-DEFAULT_QUAL = -666
+DEFAULT_QUAL = -666	# if we can't find a qual score, use this instead so we know it's missing
+
+MAX_VAL = 9999999999999	# an unreasonably large value that no reference fasta could concievably be longer than
 
 DESC   = """%prog: vcf comparison script."""
 VERS   = 0.1
@@ -77,6 +79,7 @@ PARSER.add_option('-t', help='Targetted Regions', dest='TREG', action='store', m
 PARSER.add_option('-T', help='Min Region Len',    dest='MTRL', action='store', metavar='<int>')
 
 PARSER.add_option('--no-plot', help="No plotting [%default]", dest='NO_PLOT', default=False, action='store_true')
+PARSER.add_option('--fast', help="No equivalent variant detection [%default]", dest='FAST', default=False, action='store_true')
 
 (OPTS,ARGS) = PARSER.parse_args()
 
@@ -86,6 +89,7 @@ WORKFLOW_VCF = OPTS.WVCF
 MAPTRACK     = OPTS.MTRK
 BEDFILE      = OPTS.TREG
 NO_PLOT      = OPTS.NO_PLOT
+FAST         = OPTS.FAST
 if OPTS.MTRL != None:
 	MINREGIONLEN = int(OPTS.MTRL)
 else:
@@ -173,7 +177,8 @@ def main():
 	prevR = None
 	prevP = None
 	ref_inds = []
-	print 'indexing reference fasta...'
+	print 'indexing reference fasta...',
+	tt = time.time()
 	while 1:
 		nLines += 1
 		data = f.readline()
@@ -185,6 +190,7 @@ def main():
 				ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
 			prevP = f.tell()
 			prevR = data[1:-1]
+	print '{0:.3f} (sec)'.format(time.time()-tt)
 
 	ztV = 0
 	znP = 0
@@ -236,28 +242,33 @@ def main():
 	#
 	for n_RI in ref_inds:
 		refName = n_RI[0]
-		# assumes fasta file is sane and has '\n' characters within long sequences
-		f.seek(n_RI[1])
-		print 'reading '+refName+'...',
-		myDat  = f.read(n_RI[2]-n_RI[1]).split('\n')
-		myLen  = sum([len(m) for m in myDat])
-		if sys.version_info >= (2,7):
-			print '{:,} bp\n'.format(myLen)
-		else:
-			print '{0:} bp\n'.format(myLen)
-		inWidth = len(myDat[0])
-		if len(myDat[-1]) == 0:	# if last line is empty, remove it.
-			del myDat[-1]
-		if inWidth*(len(myDat)-1)+len(myDat[-1]) != myLen:
-			print 'fasta column-width not consistent.'
-			print myLen, inWidth*(len(myDat)-1)+len(myDat[-1])
-			for i in xrange(len(myDat)):
-				if len(myDat[i]) != inWidth:
-					print i, len(myDat[i]), inWidth
-			exit(1)
 
-		myDat = bytearray(''.join(myDat)).upper()
-		myLen = len(myDat)
+		#
+		#	Read reference sequence we're currently interested in
+		#
+		#	assumes fasta file is sane and has '\n' characters within long sequences
+		if FAST == False:
+			f.seek(n_RI[1])
+			print 'reading '+refName+'...',
+			myDat  = f.read(n_RI[2]-n_RI[1]).split('\n')
+			myLen  = sum([len(m) for m in myDat])
+			if sys.version_info >= (2,7):
+				print '{:,} bp\n'.format(myLen)
+			else:
+				print '{0:} bp\n'.format(myLen)
+			inWidth = len(myDat[0])
+			if len(myDat[-1]) == 0:	# if last line is empty, remove it.
+				del myDat[-1]
+			if inWidth*(len(myDat)-1)+len(myDat[-1]) != myLen:
+				print 'fasta column-width not consistent.'
+				print myLen, inWidth*(len(myDat)-1)+len(myDat[-1])
+				for i in xrange(len(myDat)):
+					if len(myDat[i]) != inWidth:
+						print i, len(myDat[i]), inWidth
+				exit(1)
+
+			myDat = bytearray(''.join(myDat)).upper()
+			myLen = len(myDat)
 
 		#
 		#	Parse relevant targeted regions
@@ -271,7 +282,7 @@ def main():
 					targRegionsFl.extend((int(splt[1]),int(splt[2])))
 			bedfile.close()
 		else:
-			targRegionsFl = [-1,myLen+1]
+			targRegionsFl = [-1,MAX_VAL+1]
 
 		#
 		#	Parse relevant golden variants
@@ -363,61 +374,62 @@ def main():
 		#
 		#	let's check for equivalent variants
 		#
-		delList_i = []
-		delList_j = []
-		regionsToCheck = []
-		for i in xrange(len(FPvariants)):
-			pos = FPvariants[i][0][0]
-			regionsToCheck.append((max([pos-EV_BPRANGE-1,0]),min([pos+EV_BPRANGE,len(myDat)-1])))
-
-		for n in regionsToCheck:
-			refSection = myDat[n[0]:n[1]]
-
-			fpWithin = []
+		if FAST == False:
+			delList_i = []
+			delList_j = []
+			regionsToCheck = []
 			for i in xrange(len(FPvariants)):
-				m  = FPvariants[i][0]
-				if (m[0] > n[0] and m[0] < n[1]):
-					fpWithin.append((m,i))
-			fpWithin = sorted(fpWithin)
-			adj = 0
-			altSection = copy.deepcopy(refSection)
-			for (m,i) in fpWithin:
-				lr = len(m[1])
-				la = len(m[2])
-				dpos = m[0]-n[0]+adj
-				altSection = altSection[:dpos-1] + m[2] + altSection[dpos-1+lr:]
-				adj += la-lr
+				pos = FPvariants[i][0][0]
+				regionsToCheck.append((max([pos-EV_BPRANGE-1,0]),min([pos+EV_BPRANGE,len(myDat)-1])))
 
-			nfWithin = []
-			for j in xrange(len(notFound)):
-				m = notFound[j]
-				if (m[0] > n[0] and m[0] < n[1]):
-					nfWithin.append((m,j))
-			nfWithin = sorted(nfWithin)
-			adj = 0
-			altSection2 = copy.deepcopy(refSection)
-			for (m,j) in nfWithin:
-				lr = len(m[1])
-				la = len(m[2])
-				dpos = m[0]-n[0]+adj
-				altSection2 = altSection2[:dpos-1] + m[2] + altSection2[dpos-1+lr:]
-				adj += la-lr
+			for n in regionsToCheck:
+				refSection = myDat[n[0]:n[1]]
 
-			if altSection == altSection2:
+				fpWithin = []
+				for i in xrange(len(FPvariants)):
+					m  = FPvariants[i][0]
+					if (m[0] > n[0] and m[0] < n[1]):
+						fpWithin.append((m,i))
+				fpWithin = sorted(fpWithin)
+				adj = 0
+				altSection = copy.deepcopy(refSection)
 				for (m,i) in fpWithin:
-					if i not in delList_i:
-						delList_i.append(i)
-				for (m,j) in nfWithin:
-					if j not in delList_j:
-						delList_j.append(j)
+					lr = len(m[1])
+					la = len(m[2])
+					dpos = m[0]-n[0]+adj
+					altSection = altSection[:dpos-1] + m[2] + altSection[dpos-1+lr:]
+					adj += la-lr
 
-		nEquiv = 0
-		for i in sorted(list(set(delList_i)),reverse=True):
-			del FPvariants[i]
-		for j in sorted(list(set(delList_j)),reverse=True):
-			del notFound[j]
-			nEquiv += 1
-		nPerfect += nEquiv
+				nfWithin = []
+				for j in xrange(len(notFound)):
+					m = notFound[j]
+					if (m[0] > n[0] and m[0] < n[1]):
+						nfWithin.append((m,j))
+				nfWithin = sorted(nfWithin)
+				adj = 0
+				altSection2 = copy.deepcopy(refSection)
+				for (m,j) in nfWithin:
+					lr = len(m[1])
+					la = len(m[2])
+					dpos = m[0]-n[0]+adj
+					altSection2 = altSection2[:dpos-1] + m[2] + altSection2[dpos-1+lr:]
+					adj += la-lr
+
+				if altSection == altSection2:
+					for (m,i) in fpWithin:
+						if i not in delList_i:
+							delList_i.append(i)
+					for (m,j) in nfWithin:
+						if j not in delList_j:
+							delList_j.append(j)
+
+			nEquiv = 0
+			for i in sorted(list(set(delList_i)),reverse=True):
+				del FPvariants[i]
+			for j in sorted(list(set(delList_j)),reverse=True):
+				del notFound[j]
+				nEquiv += 1
+			nPerfect += nEquiv
 
 		#
 		#	Tally up errors and whatnot
@@ -505,10 +517,12 @@ def main():
 	if BEDFILE != None:
 		print 'ONLY CONSIDERING VARIANTS FOUND WITHIN TARGETED REGIONS\n\n'
 	print 'Total Golden Variants:',ztV,'\n'
-	print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
-	print 'FP variants:   ',zfP,'({0:.2f}%)'.format(100.*float(zfP)/ztV)
-	print 'FN variants:   ',znF,'({0:.2f}%)'.format(100.*float(znF)/ztV)
-	#print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
+	if ztV > 0:
+		print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
+		print 'FP variants:   ',zfP,'({0:.2f}%)'.format(100.*float(zfP)/ztV)
+		print 'FN variants:   ',znF,'({0:.2f}%)'.format(100.*float(znF)/ztV)
+	if FAST:
+		print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
 	if BEDFILE != None:
 		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',zbM
 	print '\n**********************************\n'
