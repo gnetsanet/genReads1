@@ -288,7 +288,7 @@ def main():
 		#
 		#	It begins...
 		#
-		sys.stdout.write('\ncomparing variation in '+refName+'...')
+		sys.stdout.write('comparing variation in '+refName+'...')
 		sys.stdout.flush()
 		tt = time.time()
 
@@ -446,7 +446,8 @@ def main():
 		znP += nPerfect
 		zfP += len(FPvariants)
 		znF += len(notFound)
-		znE += nEquiv
+		if FAST == False:
+			znE += nEquiv
 		if BEDFILE != None:
 			zbM += nBelowMinRLen
 
@@ -496,6 +497,7 @@ def main():
 			if venn_data[i][2]: set3.append(i+varAdj)
 		varAdj += len(notFound)
 
+		print 'RAWRRRRRRRR'
 		print '{0:.3f} (sec)'.format(time.time()-tt)
 
 	#
@@ -531,7 +533,7 @@ def main():
 		print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
 		print 'FP variants:   ',zfP,'({0:.2f}%)'.format(100.*float(zfP)/ztV)
 		print 'FN variants:   ',znF,'({0:.2f}%)'.format(100.*float(znF)/ztV)
-	if FAST:
+	if FAST == False:
 		print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
 	if BEDFILE != None:
 		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',zbM
