@@ -459,39 +459,39 @@ def main():
 			avg_dp = np.mean(correctCov.values())
 			std_dp = np.std(correctCov.values())
 
-		DP_THRESH = avg_dp - 2 * std_dp		# below this is unusually low
-		AF_THRESH = 0.7						# below this is a het variant with potentially low allele balance
+			DP_THRESH = avg_dp - 2 * std_dp		# below this is unusually low
+			AF_THRESH = 0.7						# below this is a het variant with potentially low allele balance
 
-		venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
+			venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
 
-		for i in xrange(len(notFound)):
-			var = notFound[i]
+			for i in xrange(len(notFound)):
+				var = notFound[i]
 
-			#	mappability?
-			if MAPTRACK != None:
-				if mappability_tracks[refName][var[0]]:
-					mappability_vs_FN[1] += 1
-					venn_data[i][0] = 1
-				else:
-					mappability_vs_FN[0] += 1
+				#	mappability?
+				if MAPTRACK != None:
+					if mappability_tracks[refName][var[0]]:
+						mappability_vs_FN[1] += 1
+						venn_data[i][0] = 1
+					else:
+						mappability_vs_FN[0] += 1
 
-			#	coverage?
-			if var in correctCov:
-				c = correctCov[var]
-				if c not in coverage_vs_FN:
-					coverage_vs_FN[c] = 0
-				coverage_vs_FN[c] += 1
-				if c < DP_THRESH:
-					venn_data[i][1] = 1
+				#	coverage?
+				if var in correctCov:
+					c = correctCov[var]
+					if c not in coverage_vs_FN:
+						coverage_vs_FN[c] = 0
+					coverage_vs_FN[c] += 1
+					if c < DP_THRESH:
+						venn_data[i][1] = 1
 
-			#	heterozygous genotype messing things up?
-			if var in correctAF:
-				a = AF_KEYS[quantize_AF(correctAF[var])]
-				if a not in alleleBal_vs_FN:
-					alleleBal_vs_FN[a] = 0
-				alleleBal_vs_FN[a] += 1
-				if a < AF_THRESH:
-					venn_data[i][2] = 1
+				#	heterozygous genotype messing things up?
+				if var in correctAF:
+					a = AF_KEYS[quantize_AF(correctAF[var])]
+					if a not in alleleBal_vs_FN:
+						alleleBal_vs_FN[a] = 0
+					alleleBal_vs_FN[a] += 1
+					if a < AF_THRESH:
+						venn_data[i][2] = 1
 
 		for i in xrange(len(notFound)):
 			if venn_data[i][0]: set1.append(i+varAdj)
