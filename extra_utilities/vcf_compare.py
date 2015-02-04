@@ -120,6 +120,7 @@ def quantize_AF(af):
 		return int(af*AF_STEPS)
 
 def parseLine(splt):
+	print splt
 
 	cov  = None
 	af   = 1.0
