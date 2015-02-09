@@ -168,6 +168,25 @@ def parseLine(splt):
 
 	return (cov, af, qual, alt_alleles)
 
+def condenseAlts(listIn,altsList,FNorFP):
+	to_condense   = {}
+	ext_info_dict = {}
+	for i in xrange(len(listIn)):
+		if FNorFP: var = listIn[i]
+		else: [var,extra_info] = listIn[i]
+		if var in altsList:
+			concat = (var[0],var[1],','.join([n[2] for n in altsList[var]]))
+			if not FNorFP: ext_info_dict[concat] = extra_info
+			if concat not in to_condense:
+				to_condense[concat] = []
+			to_condense[concat].append(i)
+	delList = [j for i in to_condense.values() for j in i]
+	outList = [listIn[i] for i in xrange(len(listIn)) if i not in delList]
+	for n in to_condense.keys():
+		if FNorFP: outList.append(n)
+		else: outList.append([n,ext_info_dict[n]])
+	return outList
+
 
 def main():
 
@@ -295,8 +314,8 @@ def main():
 		#
 		#	Parse relevant golden variants
 		#
-		correctVariants = []
 		correctHashed   = {}
+		correct_alts    = {}
 		correctCov      = {}
 		correctAF       = {}
 		correctQual     = {}
@@ -312,10 +331,16 @@ def main():
 					if targInd%2 == 1:
 						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
 						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
-							correctVariants.append(var)
-							correctHashed[var] = 1
 							
 							(cov, af, qual, aa) = parseLine(splt)
+
+							if len(aa):
+								allVars = [(var[0],var[1],n) for n in aa]
+								for i in xrange(len(allVars)):
+									correctHashed[allVars[i]] = 1
+									correct_alts[allVars[i]]  = allVars
+							else:
+								correctHashed[var] = 1
 
 							if cov != None:
 								correctCov[var]     = cov
@@ -361,12 +386,15 @@ def main():
 			if var in correctHashed:
 				nPerfect += 1
 				correctHashed[var] = 2
+				if var in correct_alts:
+					for v2 in correct_alts[var]:
+						correctHashed[v2] = 2
 				if var in workflow_alts:
 					alts_to_ignore.extend(workflow_alts[var])
 			else:
 				FPvariants.append([var,extraInfo])
 
-		#	remove any trace of variants who was not found, but whose alternate was
+		#	remove any trace of workflow variants who were not found, but whose alternate was
 		for i in xrange(len(FPvariants)-1,-1,-1):
 			if FPvariants[i][0] in alts_to_ignore:
 				del FPvariants[i]
@@ -374,6 +402,15 @@ def main():
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 		#print len(notFound), len(FPvariants)
 
+		#
+		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
+		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
+		#
+		notFound   = condenseAlts(notFound,correct_alts,True)
+		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+
+		#
+		#
 		totalVariants = nPerfect + len(notFound)
 		if totalVariants == 0:
 			zfP += len(FPvariants)
@@ -456,8 +493,9 @@ def main():
 		#	try to identify a reason for FN variants:
 		#
 		if len(correctCov):
-			avg_dp = np.mean(correctCov.values())
-			std_dp = np.std(correctCov.values())
+			covKeys = [n for n in correctCov.values() if n != None]
+			avg_dp = np.mean(covKeys)
+			std_dp = np.std(covKeys)
 
 			DP_THRESH = avg_dp - 2 * std_dp		# below this is unusually low
 			AF_THRESH = 0.7						# below this is a het variant with potentially low allele balance
