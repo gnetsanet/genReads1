@@ -516,11 +516,12 @@ def main():
 				#	coverage?
 				if var in correctCov:
 					c = correctCov[var]
-					if c not in coverage_vs_FN:
-						coverage_vs_FN[c] = 0
-					coverage_vs_FN[c] += 1
-					if c < DP_THRESH:
-						venn_data[i][1] = 1
+					if c != None:
+						if c not in coverage_vs_FN:
+							coverage_vs_FN[c] = 0
+						coverage_vs_FN[c] += 1
+						if c < DP_THRESH:
+							venn_data[i][1] = 1
 
 				#	heterozygous genotype messing things up?
 				if var in correctAF:
