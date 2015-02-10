@@ -185,9 +185,7 @@ def parseLine(splt):
 			af    = splt[colSamp[0]].split(':')[afInd]
 	if af != None:
 		af_splt = af.split(',')
-		if len(af_splt) == 0 or af_splt[0] == '.' or af_splt[0] == '':		# missing data, yay
-			alt_freqs = [None]
-		else:
+		if len(af_splt) != 0 and af_splt[0] != '.' and af_splt[0] != '':		# missing data, yay
 			alt_freqs = [float(n) for n in af_splt]
 	else:
 		alt_freqs = [None]*max([len(alt_alleles),1])
@@ -377,6 +375,7 @@ def main():
 						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 							
 							pl_out = parseLine(splt)
+							print pl_out
 							if pl_out == None:
 								continue
 							(cov, qual, aa, af) = pl_out
@@ -438,7 +437,6 @@ def main():
 									workflowVariants.append([allVars[i],[cov,af[i],qual,targLen]])
 									workflow_alts[allVars[i]] = allVars
 							else:
-								print var, af
 								workflowVariants.append([var,[cov,af[0],qual,targLen]])
 			else:
 				if line[1] != '#':
