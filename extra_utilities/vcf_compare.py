@@ -190,7 +190,7 @@ def parseLine(splt):
 		else:
 			alt_freqs = [float(n) for n in af_splt]
 	else:
-		alt_freqs = [None]*len(max([alt_alleles,1]))
+		alt_freqs = [None]*max([len(alt_alleles),1])
 
 	#	get QUAL if it's interesting
 	if 'QUAL' in colDict and splt[colDict['QUAL']] != '.':
