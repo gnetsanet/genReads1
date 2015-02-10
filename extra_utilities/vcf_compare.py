@@ -156,7 +156,7 @@ def parseLine(splt):
 	cov  = None
 	qual = DEFAULT_QUAL
 	alt_alleles = []
-	alt_freqs   = [None]
+	alt_freqs   = []
 
 	#	any alt alleles?
 	alt_split = aa.split(',')
@@ -185,6 +185,8 @@ def parseLine(splt):
 			af    = splt[colSamp[0]].split(':')[afInd]
 	if af != None:
 		alt_freqs = [float(n) for n in af.split(',')]
+	else:
+		alt_freqs = [None]*len(alt_alleles)
 
 	#	get QUAL if it's interesting
 	if 'QUAL' in colDict and splt[colDict['QUAL']] != '.':
