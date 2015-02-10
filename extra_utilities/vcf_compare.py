@@ -184,7 +184,11 @@ def parseLine(splt):
 			afInd = splt[colDict['FORMAT']].split(':').index('AF')
 			af    = splt[colSamp[0]].split(':')[afInd]
 	if af != None:
-		alt_freqs = [float(n) for n in af.split(',')]
+		af_splt = af.split(',')
+		if len(af_splt) == 0:
+			alt_freqs = [None]
+		else:
+			alt_freqs = [float(n) for n in af_splt]
 	else:
 		alt_freqs = [None]*len(max([alt_alleles,1]))
 
