@@ -375,7 +375,6 @@ def main():
 						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 							
 							pl_out = parseLine(splt)
-							print pl_out
 							if pl_out == None:
 								continue
 							(cov, qual, aa, af) = pl_out
