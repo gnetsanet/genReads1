@@ -71,25 +71,35 @@ VERS   = 0.1
 
 PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -g <golden.vcf> -w <workflow.vcf>',description=DESC,version="%prog v"+str(VERS))
 
-PARSER.add_option('-r', help='* Reference Fasta',   dest='REFF', action='store', metavar='<ref.fa>')
-PARSER.add_option('-g', help='* Golden VCF',        dest='GVCF', action='store', metavar='<golden.vcf>')
-PARSER.add_option('-w', help='* Workflow VCF',      dest='WVCF', action='store', metavar='<workflow.vcf>')
+PARSER.add_option('-r', help='* Reference Fasta', dest='REFF', action='store', metavar='<ref.fa>')
+PARSER.add_option('-g', help='* Golden VCF',      dest='GVCF', action='store', metavar='<golden.vcf>')
+PARSER.add_option('-w', help='* Workflow VCF',    dest='WVCF', action='store', metavar='<workflow.vcf>')
+PARSER.add_option('-o', help='* Output Prefix',   dest='OUTF', action='store', metavar='<prefix>')
 PARSER.add_option('-m', help='Mappability Track', dest='MTRK', action='store', metavar='<tracks.dat>')
 PARSER.add_option('-t', help='Targetted Regions', dest='TREG', action='store', metavar='<regions.bed>')
 PARSER.add_option('-T', help='Min Region Len',    dest='MTRL', action='store', metavar='<int>')
 
-PARSER.add_option('--no-plot', help="No plotting [%default]", dest='NO_PLOT', default=False, action='store_true')
-PARSER.add_option('--fast', help="No equivalent variant detection [%default]", dest='FAST', default=False, action='store_true')
+PARSER.add_option('--vcf-out',   help="Output Match/FN/FP variants [%default]",       dest='VCF_OUT', default=False, action='store_true')
+PARSER.add_option('--no-plot',   help="No plotting [%default]",                       dest='NO_PLOT', default=False, action='store_true')
+PARSER.add_option('--incl-homs', help="Include homozygous ref calls [%default]",      dest='INCL_H',  default=False, action='store_true')
+PARSER.add_option('--incl-fail', help="Include calls that failed filters [%default]", dest='INCL_F',  default=False, action='store_true')
+PARSER.add_option('--fast',      help="No equivalent variant detection [%default]",   dest='FAST',    default=False, action='store_true')
 
 (OPTS,ARGS) = PARSER.parse_args()
 
 REFERENCE    = OPTS.REFF
 GOLDEN_VCF   = OPTS.GVCF
 WORKFLOW_VCF = OPTS.WVCF
+OUT_PREFIX   = OPTS.OUTF
 MAPTRACK     = OPTS.MTRK
 BEDFILE      = OPTS.TREG
+
+VCF_OUT      = OPTS.VCF_OUT
 NO_PLOT      = OPTS.NO_PLOT
+INCLUDE_HOMS = OPTS.INCL_H
+INCLUDE_FAIL = OPTS.INCL_F
 FAST         = OPTS.FAST
+
 if OPTS.MTRL != None:
 	MINREGIONLEN = int(OPTS.MTRL)
 else:
@@ -103,6 +113,9 @@ if GOLDEN_VCF == None:
 	exit(1)
 if WORKFLOW_VCF == None:
 	print 'Error: No workflow VCF provided.'
+	exit(1)
+if OUT_PREFIX == None:
+	print 'Error: No output prefix provided.'
 	exit(1)
 if (BEDFILE != None and MINREGIONLEN == None) or (BEDFILE == None and MINREGIONLEN != None):
 	print 'Error: Both -t and -T must be specified'
@@ -123,50 +136,57 @@ def quantize_AF(af):
 	else:
 		return int(af*AF_STEPS)
 
+colDict = {}	# [col_name] = col_index
+colSamp = []	# list of indices of columns containing info fields for each sample present
+
+VCF_HEADER = '##fileformat=VCFv4.1\n##reference='+REFERENCE+'##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">\n##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n'
+
 def parseLine(splt):
 
+	#	check if we want to proceed..
+	aa = splt[colDict['ALT']]
+	if not(INCLUDE_HOMS) and (aa == '.' or aa == ''):
+		return None
+	if not(INCLUDE_FAIL) and (splt[colDict['FILTER']] != 'PASS'):
+		return None
+
+	#	default vals
 	cov  = None
-	af   = 1.0
 	qual = DEFAULT_QUAL
 	alt_alleles = []
+	alt_freqs   = []
 
 	#	any alt alleles?
-	alt_split = splt[4].split(',')
+	alt_split = aa.split(',')
 	if len(alt_split) > 1:
 		alt_alleles = alt_split
 
-	#	do we have the necessary fields to compute DP/AF stats?
-	if len(splt) >= 8:
+	#	check INFO for DP first
+	if 'INFO' in colDict and 'DP=' in splt[colDict['INFO']]:
+		cov = int(re.findall(r"DP=[0-9]+",splt[colDict['INFO']])[0][3:])
+	#	check FORMAT/SAMPLE for DP second:
+	elif 'FORMAT' in colDict and len(colSamp):
+		format = splt[colDict['FORMAT']]+':'
+		if ':DP:' in format:
+			dpInd = format.split(':').index('DP')
+			cov   = int(splt[colSamp[0]].split(':')[dpInd])
 
-		#	get variant coverage
-		#
-		if 'DP=' in splt[7]:
-			cov = int(re.findall(r"DP=[0-9]+",splt[7])[0][3:])
-		# check for different formatting
-		elif len(splt) >= 9:
-			splt[8] += ':'
-			if ':DP:' in splt[8]:
-				dpInd = splt[8].split(':').index('DP')
-				cov   = int(splt[9].split(':')[dpInd])
+	#	check INFO for AF first
+	if 'INFO' in colDict and 'AF=' in splt[colDict['INFO']]:
+		af  = re.findall(r"AF=.*?(?=;)",splt[colDict['INFO']])[0][3:]
+	#	check FORMAT/SAMPLE for AF second:
+	elif 'FORMAT' in colDict and len(colSamp):
+		format = splt[colDict['FORMAT']]+':'
+		if ':AF:' in format:
+			afInd = splt[colDict['FORMAT']].split(':').index('AF')
+			af    = splt[colSamp[0]].split(':')[afInd]
+	alt_freqs = [float(n) for n in af.split(',')]
 
-		#	get variant AF (for heterozygous genotypes)
-		#
-		af = 1.0
-		if 'AF=' in splt[7]:
-			af  = float(re.findall(r"AF=.*?(?=;)",splt[7])[0][3:])
-		# check for different formatting
-		elif len(splt) >= 9:
-			splt[8] += ':'
-			if ':AF:' in splt[8]:
-				afInd = splt[8].split(':').index('AF')
-				af    = float(splt[9].split(':')[afInd])
+	#	get QUAL if it's interesting
+	if 'QUAL' in colDict and splt[colDict['QUAL']] != '.':
+		qual = float(splt[colDict['QUAL']])
 
-		#	get variant call quality
-		#
-		if splt[5] != '.':
-			qual = float(splt[5])
-
-	return (cov, af, qual, alt_alleles)
+	return (cov, qual, alt_alleles, alt_freqs)
 
 def condenseAlts(listIn,altsList,FNorFP):
 	to_condense   = {}
@@ -248,6 +268,15 @@ def main():
 			mappability_tracks[names[i]] = decompressTrack((lens[i],mapf.read(bytes[i])))
 
 	#
+	#	init vcf output, if desired
+	#
+	if VCF_OUT:
+		vcfo2 = open(OUT_PREFIX+'_FN.vcf','w')
+		vcfo3 = open(OUT_PREFIX+'_FP.vcf','w')
+		vcfo2_firstTime = True
+		vcfo3_firstTime = True
+
+	#
 	#	data for plotting FN analysis
 	#
 	set1 = []
@@ -321,8 +350,12 @@ def main():
 		correctQual     = {}
 		correctTargLen  = {}
 		nBelowMinRLen   = 0
+		global colDict  = {}
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
+				if len(colDict) == 0:
+					print '\n\nError: Golden VCF has no header?\n\n'
+					exit(1)
 				splt = line.split('\t')
 				if splt[0] == refName:
 					var  = (int(splt[1]),splt[3],splt[4])
@@ -332,7 +365,10 @@ def main():
 						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
 						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 							
-							(cov, af, qual, aa) = parseLine(splt)
+							pl_out = parseLine(splt)
+							if pl_out == None:
+								continue
+							(cov, qual, aa, af) = pl_out
 
 							if len(aa):
 								allVars = [(var[0],var[1],n) for n in aa]
@@ -343,20 +379,34 @@ def main():
 								correctHashed[var] = 1
 
 							if cov != None:
-								correctCov[var]     = cov
-							correctAF[var]      = af
+								correctCov[var] = cov
+							correctAF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
 							correctQual[var]    = qual
 							correctTargLen[var] = targLen
 						else:
 							nBelowMinRLen += 1
+			else:
+				if line[1] != '#':
+					cols = line[1:-1].split('\t')
+					for i in xrange(len(cols)):
+						if 'FORMAT' in colDict:
+							colSamp.append(i)
+						colDict[cols[i]] = i
+					if vcfo2_firstTime:
+						vcfo2_firstTime = False
+						vcfo2.write(line)
 
 		#
 		#	Parse relevant workflow variants
 		#
 		workflowVariants = []
 		workflow_alts    = {}
+		colDict          = {}
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
+				if len(colDict) == 0:
+					print '\n\nError: Workflow VCF has no header?\n\n'
+					exit(1)
 				splt = line.split('\t')
 				if splt[0] == refName:
 					var  = (int(splt[1]),splt[3],splt[4])
@@ -366,15 +416,28 @@ def main():
 						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
 						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 							
-							(cov, af, qual, aa) = parseLine(splt)
+							pl_out = parseLine(splt)
+							if pl_out == None:
+								continue
+							(cov, qual, aa, af) = pl_out
 
 							if len(aa):
 								allVars = [(var[0],var[1],n) for n in aa]
 								for i in xrange(len(allVars)):
-									workflowVariants.append([allVars[i],[cov,af,qual,targLen]])
+									workflowVariants.append([allVars[i],[cov,af[i],qual,targLen]])
 									workflow_alts[allVars[i]] = allVars
 							else:
-								workflowVariants.append([var,[cov,af,qual,targLen]])
+								workflowVariants.append([var,[cov,af[0],qual,targLen]])
+			else:
+				if line[1] != '#':
+					cols = line[1:-1].split('\t')
+					for i in xrange(len(cols)):
+						if 'FORMAT' in colDict:
+							colSamp.append(i)
+						colDict[cols[i]] = i
+					if vcfo3_firstTime:
+						vcfo3_firstTime = False
+						vcfo3.write(line)
 
 		#
 		#	Deduce which variants are FP / FN
@@ -538,7 +601,23 @@ def main():
 				if venn_data[i][2]: set3.append(i+varAdj)
 			varAdj += len(notFound)
 
+		#
+		#	if desired, write out vcf files
+		#
+		if VCF_OUT:
+			for var in notFound:
+				vcfo2.write('')
+			for [var,extraInfo] in FPvariants:
+				vcfo3.write('')
+
 		print '{0:.3f} (sec)'.format(time.time()-tt)
+
+	#
+	#	close vcf output
+	#
+	if VCF_OUT:
+		vcfo2.close()
+		vcfo3.close()
 
 	#
 	#	plot some FN stuff
