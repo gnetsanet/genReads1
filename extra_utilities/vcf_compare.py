@@ -156,7 +156,7 @@ def parseLine(splt):
 	cov  = None
 	qual = DEFAULT_QUAL
 	alt_alleles = []
-	alt_freqs   = []
+	alt_freqs   = [None]
 
 	#	any alt alleles?
 	alt_split = aa.split(',')
