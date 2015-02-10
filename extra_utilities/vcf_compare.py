@@ -395,7 +395,7 @@ def main():
 						if 'FORMAT' in colDict:
 							colSamp.append(i)
 						colDict[cols[i]] = i
-					if vcfo2_firstTime:
+					if VCF_OUT and vcfo2_firstTime:
 						vcfo2_firstTime = False
 						vcfo2.write(line)
 
@@ -438,7 +438,7 @@ def main():
 						if 'FORMAT' in colDict:
 							colSamp.append(i)
 						colDict[cols[i]] = i
-					if vcfo3_firstTime:
+					if VCF_OUT and vcfo3_firstTime:
 						vcfo3_firstTime = False
 						vcfo3.write(line)
 
