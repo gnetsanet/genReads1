@@ -352,7 +352,8 @@ def main():
 		correctQual     = {}
 		correctTargLen  = {}
 		nBelowMinRLen   = 0
-		global colDict  = {}
+		global colDict
+		colDict = {}
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
