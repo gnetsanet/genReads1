@@ -156,7 +156,7 @@ def parseLine(splt):
 	cov  = None
 	qual = DEFAULT_QUAL
 	alt_alleles = []
-	alt_freqs   = []
+	alt_freqs   = [None]
 
 	#	any alt alleles?
 	alt_split = aa.split(',')
@@ -593,12 +593,14 @@ def main():
 
 				#	heterozygous genotype messing things up?
 				if var in correctAF:
-					a = AF_KEYS[quantize_AF(correctAF[var])]
-					if a not in alleleBal_vs_FN:
-						alleleBal_vs_FN[a] = 0
-					alleleBal_vs_FN[a] += 1
-					if a < AF_THRESH:
-						venn_data[i][2] = 1
+					a = correctAF[var]
+					if a != None:
+						a = AF_KEYS[quantize_AF(a)]
+						if a not in alleleBal_vs_FN:
+							alleleBal_vs_FN[a] = 0
+						alleleBal_vs_FN[a] += 1
+						if a < AF_THRESH:
+							venn_data[i][2] = 1
 
 			for i in xrange(len(notFound)):
 				if venn_data[i][0]: set1.append(i+varAdj)
