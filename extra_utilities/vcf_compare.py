@@ -174,6 +174,7 @@ def parseLine(splt):
 			cov   = int(splt[colSamp[0]].split(':')[dpInd])
 
 	#	check INFO for AF first
+	af = None
 	if 'INFO' in colDict and 'AF=' in splt[colDict['INFO']]:
 		af  = re.findall(r"AF=.*?(?=;)",splt[colDict['INFO']])[0][3:]
 	#	check FORMAT/SAMPLE for AF second:
@@ -182,7 +183,8 @@ def parseLine(splt):
 		if ':AF:' in format:
 			afInd = splt[colDict['FORMAT']].split(':').index('AF')
 			af    = splt[colSamp[0]].split(':')[afInd]
-	alt_freqs = [float(n) for n in af.split(',')]
+	if af != None:
+		alt_freqs = [float(n) for n in af.split(',')]
 
 	#	get QUAL if it's interesting
 	if 'QUAL' in colDict and splt[colDict['QUAL']] != '.':
