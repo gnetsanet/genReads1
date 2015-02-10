@@ -122,6 +122,8 @@ if (BEDFILE != None and MINREGIONLEN == None) or (BEDFILE == None and MINREGIONL
 	exit(1)
 
 if NO_PLOT == False:
+	import matplotlib
+	matplotlib.use('Agg')
 	import matplotlib.pyplot as mpl
 	from matplotlib_venn import venn2, venn3
 
@@ -638,7 +640,7 @@ def main():
 		mpl.figtext(0.5,0.95,tstr1,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 		mpl.figtext(0.5,0.03,tstr2,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 
-		mpl.show()
+		mpl.savefig(OUT_PREFIX+'_FNvenn.pdf')
 
 
 	#
