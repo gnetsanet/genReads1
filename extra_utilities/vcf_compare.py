@@ -438,6 +438,7 @@ def main():
 									workflowVariants.append([allVars[i],[cov,af[i],qual,targLen]])
 									workflow_alts[allVars[i]] = allVars
 							else:
+								print var, af
 								workflowVariants.append([var,[cov,af[0],qual,targLen]])
 			else:
 				if line[1] != '#':
