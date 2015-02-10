@@ -185,7 +185,7 @@ def parseLine(splt):
 			af    = splt[colSamp[0]].split(':')[afInd]
 	if af != None:
 		af_splt = af.split(',')
-		if len(af_splt) == 0:
+		if len(af_splt) == 0 or af_splt[0] == '.' or af_splt == '':		# missing data, yay
 			alt_freqs = [None]
 		else:
 			alt_freqs = [float(n) for n in af_splt]
