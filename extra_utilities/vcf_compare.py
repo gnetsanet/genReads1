@@ -176,7 +176,8 @@ def parseLine(splt):
 	#	check INFO for AF first
 	af = None
 	if 'INFO' in colDict and 'AF=' in splt[colDict['INFO']]:
-		af  = re.findall(r"AF=.*?(?=;)",splt[colDict['INFO']])[0][3:]
+		info = splt[colDict['INFO']]+';'
+		af  = re.findall(r"AF=.*?(?=;)",info)[0][3:]
 	#	check FORMAT/SAMPLE for AF second:
 	elif 'FORMAT' in colDict and len(colSamp):
 		format = splt[colDict['FORMAT']]+':'
