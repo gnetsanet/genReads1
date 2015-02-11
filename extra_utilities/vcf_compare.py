@@ -186,6 +186,8 @@ def parseLine(splt):
 			af    = splt[colSamp[0]].split(':')[afInd]
 	if af != None:
 		af_splt = af.split(',')
+		while(len(af_splt) < len(alt_alleles)):	# are we lacking enough AF values for some reason?
+			af_splt.append(af_splt[-1])			# phone it in.
 		if len(af_splt) != 0 and af_splt[0] != '.' and af_splt[0] != '':		# missing data, yay
 			alt_freqs = [float(n) for n in af_splt]
 	else:
@@ -242,6 +244,7 @@ def main():
 	print '{0:.3f} (sec)'.format(time.time()-tt)
 
 	ztV = 0
+	ztW = 0
 	znP = 0
 	zfP = 0
 	znF = 0
@@ -413,6 +416,7 @@ def main():
 		#
 		#	Parse relevant workflow variants
 		#
+		workflowHashed   = {}
 		workflowVariants = []
 		line_workflow    = 0
 		workflow_alts    = {}
@@ -425,6 +429,11 @@ def main():
 				splt = line.split('\t')
 				if splt[0] == refName:
 					var  = (int(splt[1]),splt[3],splt[4])
+
+					if var in workflowHashed:
+						continue
+					workflowHashed[var] = 1
+
 					targInd = bisect.bisect(targRegionsFl,var[0])
 
 					if targInd%2 == 1:
@@ -501,6 +510,7 @@ def main():
 		totalVariants = nPerfect + len(notFound)
 		if totalVariants == 0:
 			zfP += len(FPvariants)
+			ztW += line_golden
 			print '{0:.3f} (sec)'.format(time.time()-tt)
 			continue
 
@@ -568,6 +578,7 @@ def main():
 		#	Tally up errors and whatnot
 		#
 		ztV += totalVariants
+		ztW += line_workflow
 		znP += nPerfect
 		zfP += len(FPvariants)
 		znF += len(notFound)
@@ -628,20 +639,30 @@ def main():
 			varAdj += len(notFound)
 
 		#
-		#	if desired, write out vcf files
+		#	if desired, write out vcf files. (This step mangles the FPvariants lists, don't use those after this!)
 		#
+		FPvariants = [n[0] for n in FPvariants]
 		if VCF_OUT:
-			for var in notFound:
-				vcfo2.write('')
-			for [var,extraInfo] in FPvariants:
-				vcfo3.write('')
+			for line in open(GOLDEN_VCF,'r'):
+				if line[0] != '#':
+					var  = (int(splt[1]),splt[3],splt[4])
+					if var in notFound:
+						vcfo2.write(line)
+			for line in open(WORKFLOW_VCF,'r'):
+				if line[0] != '#':
+					var  = (int(splt[1]),splt[3],splt[4])
+					if var in FPvariants:
+						vcfo3.write(line)
 
 		print '{0:.3f} (sec)'.format(time.time()-tt)
 
 	#
 	#	close vcf output
 	#
+	print ''
 	if VCF_OUT:
+		print OUT_PREFIX+'_FN.vcf'
+		print OUT_PREFIX+'_FP.vcf'
 		vcfo2.close()
 		vcfo3.close()
 
@@ -664,7 +685,9 @@ def main():
 		mpl.figtext(0.5,0.95,tstr1,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 		mpl.figtext(0.5,0.03,tstr2,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 
-		mpl.savefig(OUT_PREFIX+'_FNvenn.pdf')
+		ouf = OUT_PREFIX+'_FNvenn.pdf'
+		print ouf
+		mpl.savefig(ouf)
 
 
 	#
@@ -673,11 +696,12 @@ def main():
 	print '\n**********************************\n'
 	if BEDFILE != None:
 		print 'ONLY CONSIDERING VARIANTS FOUND WITHIN TARGETED REGIONS\n\n'
-	print 'Total Golden Variants:',ztV,'\n'
-	if ztV > 0:
+	print 'Total Golden Variants:  ',ztV
+	print 'Total Workflow Variants:',ztW,'\n'
+	if ztV > 0 and ztW > 0:
 		print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
-		print 'FP variants:   ',zfP,'({0:.2f}%)'.format(100.*float(zfP)/ztV)
 		print 'FN variants:   ',znF,'({0:.2f}%)'.format(100.*float(znF)/ztV)
+		print 'FP variants:   ',zfP,'({0:.2f}%)'.format(100.*float(zfP)/ztW)
 	if FAST == False:
 		print '\nNumber of equivalent variants denoted differently between the two vcfs:',znE
 	if BEDFILE != None:
