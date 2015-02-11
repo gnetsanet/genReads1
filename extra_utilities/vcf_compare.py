@@ -489,29 +489,16 @@ def main():
 		#                    = 3: should be discluded because an alt was found
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 
-		#print ''
-		#print nPerfect
-		#print 'rawr! Golden:',len(correctHashed),'-->',len(notFound),'-->',
-		#notFound   = condenseAlts(notFound,correct_alts,True)
-		#print len(notFound)
-		#print 'rawr! Workfl:',len(workflowVariants),'-->',len(FPvariants),'-->',
-		#FPvariants = condenseAlts(FPvariants,workflow_alts,False)
-		#print len(FPvariants)
-		#print correct_alts
-		#if refName == 'chr1':
-		#	exit(1)
-
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		#notFound   = condenseAlts(notFound,correct_alts,True)
-		#FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+		notFound   = condenseAlts(notFound,correct_alts,True)
+		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
 
 		#
 		#
 		totalVariants = nPerfect + len(notFound)
-		print '\n', line_golden, nPerfect + len(notFound), nPerfect + len(condenseAlts(notFound,correct_alts,True))
 		if totalVariants == 0:
 			zfP += len(FPvariants)
 			print '{0:.3f} (sec)'.format(time.time()-tt)
