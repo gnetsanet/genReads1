@@ -151,8 +151,6 @@ def parseLine(splt):
 		return None
 	if not(INCLUDE_FAIL) and (splt[colDict['FILTER']] != 'PASS'):
 		return None
-	if ',' in aa:
-		return None
 
 	#	default vals
 	cov  = None
@@ -475,7 +473,7 @@ def main():
 				del FPvariants[i]
 		
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
-		
+
 		#print ''
 		#print nPerfect
 		#print 'rawr! Golden:',len(correctHashed),'-->',len(notFound),'-->',
@@ -492,8 +490,8 @@ def main():
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		notFound   = condenseAlts(notFound,correct_alts,True)
-		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+		#notFound   = condenseAlts(notFound,correct_alts,True)
+		#FPvariants = condenseAlts(FPvariants,workflow_alts,False)
 
 		#
 		#
