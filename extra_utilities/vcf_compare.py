@@ -474,6 +474,7 @@ def main():
 		
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 		print ''
+		print nPerfect
 		print 'rawr! Golden:',len(correctHashed),'-->',len(notFound),'-->',
 		notFound   = condenseAlts(notFound,correct_alts,True)
 		print len(notFound)
