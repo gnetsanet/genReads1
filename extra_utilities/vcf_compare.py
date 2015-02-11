@@ -641,18 +641,23 @@ def main():
 		#
 		#	if desired, write out vcf files. (This step mangles the FPvariants lists, don't use those after this!)
 		#
-		FPvariants = [n[0] for n in FPvariants]
+		notFound   = sorted(notFound)
+		FPvariants = sorted([n[0] for n in FPvariants])
 		if VCF_OUT:
 			for line in open(GOLDEN_VCF,'r'):
 				if line[0] != '#':
-					var  = (int(splt[1]),splt[3],splt[4])
-					if var in notFound:
-						vcfo2.write(line)
+					splt = line.split('\t')
+					if splt[0] == refName:
+						var  = (int(splt[1]),splt[3],splt[4])
+						if var in notFound:
+							vcfo2.write(line)
 			for line in open(WORKFLOW_VCF,'r'):
 				if line[0] != '#':
-					var  = (int(splt[1]),splt[3],splt[4])
-					if var in FPvariants:
-						vcfo3.write(line)
+					splt = line.split('\t')
+					if splt[0] == refName:
+						var  = (int(splt[1]),splt[3],splt[4])
+						if var in FPvariants:
+							vcfo3.write(line)
 
 		print '{0:.3f} (sec)'.format(time.time()-tt)
 
