@@ -359,6 +359,7 @@ def main():
 		correctQual     = {}
 		correctTargLen  = {}
 		nBelowMinRLen   = 0
+		line_golden     = 0
 		global colDict
 		colDict = {}
 		for line in open(GOLDEN_VCF,'r'):
@@ -393,6 +394,7 @@ def main():
 							correctAF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
 							correctQual[var]    = qual
 							correctTargLen[var] = targLen
+							line_golden += 1
 						else:
 							nBelowMinRLen += 1
 			else:
@@ -410,6 +412,7 @@ def main():
 		#	Parse relevant workflow variants
 		#
 		workflowVariants = []
+		line_workflow    = 0
 		workflow_alts    = {}
 		colDict          = {}
 		for line in open(WORKFLOW_VCF,'r'):
@@ -438,6 +441,7 @@ def main():
 									workflow_alts[allVars[i]] = allVars
 							else:
 								workflowVariants.append([var,[cov,af[0],qual,targLen]])
+							line_workflow += 1
 			else:
 				if line[1] != '#':
 					cols = line[1:-1].split('\t')
@@ -496,6 +500,7 @@ def main():
 		#
 		#
 		totalVariants = nPerfect + len(notFound)
+		print '\n', line_golden, totalVariants
 		if totalVariants == 0:
 			zfP += len(FPvariants)
 			print '{0:.3f} (sec)'.format(time.time()-tt)
