@@ -474,7 +474,8 @@ def main():
 			if FPvariants[i][0] in alts_to_ignore:
 				del FPvariants[i]
 		
-		#notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
+		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
+		
 		#print ''
 		#print nPerfect
 		#print 'rawr! Golden:',len(correctHashed),'-->',len(notFound),'-->',
