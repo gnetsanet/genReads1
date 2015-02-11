@@ -151,6 +151,8 @@ def parseLine(splt):
 		return None
 	if not(INCLUDE_FAIL) and (splt[colDict['FILTER']] != 'PASS'):
 		return None
+	if ',' in aa:
+		return None
 
 	#	default vals
 	cov  = None
@@ -472,22 +474,25 @@ def main():
 			if FPvariants[i][0] in alts_to_ignore:
 				del FPvariants[i]
 		
-		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
-		print ''
-		print nPerfect
-		print 'rawr! Golden:',len(correctHashed),'-->',len(notFound),'-->',
-		notFound   = condenseAlts(notFound,correct_alts,True)
-		print len(notFound)
-		print 'rawr! Workfl:',len(workflowVariants),'-->',len(FPvariants),'-->',
-		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
-		print len(FPvariants)
+		#notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
+		#print ''
+		#print nPerfect
+		#print 'rawr! Golden:',len(correctHashed),'-->',len(notFound),'-->',
+		#notFound   = condenseAlts(notFound,correct_alts,True)
+		#print len(notFound)
+		#print 'rawr! Workfl:',len(workflowVariants),'-->',len(FPvariants),'-->',
+		#FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+		#print len(FPvariants)
+		#print correct_alts
+		#if refName == 'chr1':
+		#	exit(1)
 
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		#notFound   = condenseAlts(notFound,correct_alts,True)
-		#FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+		notFound   = condenseAlts(notFound,correct_alts,True)
+		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
 
 		#
 		#
