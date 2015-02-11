@@ -211,8 +211,6 @@ def condenseAlts(listIn,altsList,FNorFP):
 			to_condense[concat].append(i)
 	delList = [j for i in to_condense.values() for j in i]
 	outList = [listIn[i] for i in xrange(len(listIn)) if i not in delList]
-	print 'rawr:',delList
-	print 'rawr:',to_condense.keys()
 	for n in to_condense.keys():
 		if FNorFP: outList.append(n)
 		else: outList.append([n,ext_info_dict[n]])
@@ -504,6 +502,7 @@ def main():
 		#
 		#
 		totalVariants = nPerfect + len(notFound)
+		print 'rawr:',len(notFound),len(list(set(notFound)))
 		print '\n', line_golden, nPerfect + len(notFound), nPerfect + len(condenseAlts(notFound,correct_alts,True))
 		if totalVariants == 0:
 			zfP += len(FPvariants)
