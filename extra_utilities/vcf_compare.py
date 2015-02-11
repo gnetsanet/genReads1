@@ -381,20 +381,22 @@ def main():
 								continue
 							(cov, qual, aa, af) = pl_out
 
-							if len(aa):
-								allVars = [(var[0],var[1],n) for n in aa]
-								for i in xrange(len(allVars)):
-									correctHashed[allVars[i]] = 1
-									correct_alts[allVars[i]]  = allVars
-							else:
-								correctHashed[var] = 1
+							if var not in correctHashed:
+								if len(aa):
+									allVars = [(var[0],var[1],n) for n in aa]
+									for i in xrange(len(allVars)):
+										correctHashed[allVars[i]] = 1
+										correct_alts[allVars[i]]  = allVars
+								else:
+									correctHashed[var] = 1
 
-							if cov != None:
-								correctCov[var] = cov
-							correctAF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
-							correctQual[var]    = qual
-							correctTargLen[var] = targLen
-							line_golden += 1
+								if cov != None:
+									correctCov[var] = cov
+								correctAF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
+								correctQual[var]    = qual
+								correctTargLen[var] = targLen
+								line_golden += 1
+								
 						else:
 							nBelowMinRLen += 1
 			else:
