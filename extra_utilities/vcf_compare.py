@@ -464,10 +464,16 @@ def main():
 		for [var,extraInfo] in workflowVariants:
 			if var in correctHashed:
 				nPerfect += 1
-				correctHashed[var] = 2
+				if correctHashed[var] != 3:
+					correctHashed[var] = 2
 				if var in correct_alts:				# ignore golden alts if one of them was found
+					alreadySeen = True
 					for v2 in correct_alts[var]:
-						correctHashed[v2] = 2
+						if correctHashed[v2] != 3:
+							correctHashed[v2] = 3
+							alreadySeen = False
+					if alreadySeen:
+						nPerfect -= 1
 				if var in workflow_alts:
 					alts_to_ignore.extend(workflow_alts[var])
 			else:
@@ -478,6 +484,9 @@ def main():
 			if FPvariants[i][0] in alts_to_ignore:
 				del FPvariants[i]
 		
+		# correctHashed[var] = 1: were not found
+		#                    = 2: should be discluded because we were found
+		#                    = 3: should be discluded because an alt was found
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 
 		#print ''
@@ -502,7 +511,6 @@ def main():
 		#
 		#
 		totalVariants = nPerfect + len(notFound)
-		print 'rawr:',len(notFound),len(list(set(notFound)))
 		print '\n', line_golden, nPerfect + len(notFound), nPerfect + len(condenseAlts(notFound,correct_alts,True))
 		if totalVariants == 0:
 			zfP += len(FPvariants)
