@@ -500,7 +500,7 @@ def main():
 		#
 		#
 		totalVariants = nPerfect + len(notFound)
-		print '\n', line_golden, totalVariants
+		print '\n', line_golden, nPerfect + len(notFound), nPerfect + len(condenseAlts(notFound,correct_alts,True))
 		if totalVariants == 0:
 			zfP += len(FPvariants)
 			print '{0:.3f} (sec)'.format(time.time()-tt)
