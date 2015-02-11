@@ -396,7 +396,7 @@ def main():
 								correctQual[var]    = qual
 								correctTargLen[var] = targLen
 								line_golden += 1
-								
+
 						else:
 							nBelowMinRLen += 1
 			else:
@@ -503,6 +503,7 @@ def main():
 		#
 		totalVariants = nPerfect + len(notFound)
 		print '\n', line_golden, nPerfect + len(notFound), nPerfect + len(condenseAlts(notFound,correct_alts,True))
+		print correct_alts
 		if totalVariants == 0:
 			zfP += len(FPvariants)
 			print '{0:.3f} (sec)'.format(time.time()-tt)
