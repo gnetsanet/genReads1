@@ -473,7 +473,8 @@ def main():
 				del FPvariants[i]
 		
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
-		#print len(notFound), len(FPvariants)
+		print 'rawr! Golden:',len(correctHashed),'-->',len(notFound)
+		print 'rawr! Workfl:',len(workflowVariants),'-->',len(FPvariants)
 
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
