@@ -459,7 +459,7 @@ def main():
 			if var in correctHashed:
 				nPerfect += 1
 				correctHashed[var] = 2
-				if var in correct_alts:
+				if var in correct_alts:				# ignore golden alts if one of them was found
 					for v2 in correct_alts[var]:
 						correctHashed[v2] = 2
 				if var in workflow_alts:
@@ -473,15 +473,20 @@ def main():
 				del FPvariants[i]
 		
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
-		print 'rawr! Golden:',len(correctHashed),'-->',len(notFound)
-		print 'rawr! Workfl:',len(workflowVariants),'-->',len(FPvariants)
+		print ''
+		print 'rawr! Golden:',len(correctHashed),'-->',len(notFound),'-->',
+		notFound   = condenseAlts(notFound,correct_alts,True)
+		print len(notFound)
+		print 'rawr! Workfl:',len(workflowVariants),'-->',len(FPvariants),'-->',
+		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+		print len(FPvariants)
 
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		notFound   = condenseAlts(notFound,correct_alts,True)
-		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+		#notFound   = condenseAlts(notFound,correct_alts,True)
+		#FPvariants = condenseAlts(FPvariants,workflow_alts,False)
 
 		#
 		#
