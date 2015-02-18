@@ -165,9 +165,13 @@ if GC_BIAS:
 else:
 	RELATIVE_GC_COVERAGE_BIAS = [1. for n in GC_COVERAGE]
 
-AB      = np.linspace(AB_MEAN-3*AB_STD,AB_MEAN+3*AB_STD,20).tolist()
-AB_PROB = [np.exp(-(((n-AB_MEAN)**2)/(2*(AB_STD**2)))) for n in AB]
-AB_PROB = [n/sum(AB_PROB) for n in AB_PROB]
+if AB_STD > 0.0:
+	AB      = np.linspace(AB_MEAN-3*AB_STD,AB_MEAN+3*AB_STD,20).tolist()
+	AB_PROB = [np.exp(-(((n-AB_MEAN)**2)/(2*(AB_STD**2)))) for n in AB]
+	AB_PROB = [n/sum(AB_PROB) for n in AB_PROB]
+else:
+	AB      = [AB_MEAN]
+	AB_PROB = [1.0]
 
 if OPTS.RNG == None:
 	RNG_SEED   = random.randint(1,99999999)
@@ -1677,7 +1681,7 @@ def main():
 
 					else:
 
-						samFlag1 = str(int('001100000',2))
+						samFlag1 = str(int('000000000',2))
 						pos1     = str(r1pos)
 						mapQ1    = str(70)
 						mateRef  = '*'

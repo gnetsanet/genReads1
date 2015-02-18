@@ -149,7 +149,7 @@ def parseLine(splt):
 	aa = splt[colDict['ALT']]
 	if not(INCLUDE_HOMS) and (aa == '.' or aa == ''):
 		return None
-	if not(INCLUDE_FAIL) and (splt[colDict['FILTER']] != 'PASS'):
+	if not(INCLUDE_FAIL) and (splt[colDict['FILTER']] != 'PASS' and splt[colDict['FILTER']] != '.'):
 		return None
 
 	#	default vals
