@@ -269,7 +269,9 @@ def main():
 	#
 	mappability_tracks = {}
 	if MAPTRACK != None:
-		print 'reading mappability tracks...'
+		sys.stdout.write('reading mappability tracks... ')
+		sys.stdout.flush()
+		tt = time.time()
 		mapf = open(MAPTRACK,"rb")
 		[headerLen] = np.fromfile(mapf,'<i4',1)
 		header = mapf.read(headerLen)
@@ -284,6 +286,7 @@ def main():
 
 		for i in xrange(len(names)):
 			mappability_tracks[names[i]] = decompressTrack((lens[i],mapf.read(bytes[i])))
+		print '{0:.3f} (sec)'.format(time.time()-tt)
 
 	#
 	#	init vcf output, if desired
@@ -601,8 +604,8 @@ def main():
 			avg_dp = np.mean(covKeys)
 			std_dp = np.std(covKeys)
 
-			DP_THRESH = avg_dp - 2 * std_dp		# below this is unusually low
-			AF_THRESH = 0.7						# below this is a het variant with potentially low allele balance
+			DP_THRESH = int(avg_dp - 2 * std_dp)		# below this is unusually low
+			AF_THRESH = 0.3								# below this is a het variant with potentially low allele balance
 
 			venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
 
@@ -690,9 +693,9 @@ def main():
 		tstr1 = 'False Negative Variants (Missed Detections)'
 		tstr2 = str(nDetected)+' / '+str(znF)+' FN variants categorized'
 		if MAPTRACK != None:
-			v = venn3([set1, set2, set3], ('Unmappable', 'Low Coverage', 'Heterozygous'))
+			v = venn3([set1, set2, set3], ('Unmappable', 'DP < '+str(DP_THRESH), 'AF < '+str(AF_THRESH)))
 		else:
-			v = venn2([set2, set3], ('Low Coverage', 'Heterozygous'))
+			v = venn2([set2, set3], ('DP < '+str(DP_THRESH), 'AF < '+str(AF_THRESH))))
 		mpl.figtext(0.5,0.95,tstr1,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 		mpl.figtext(0.5,0.03,tstr2,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 
