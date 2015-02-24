@@ -143,6 +143,8 @@ colSamp = []	# list of indices of columns containing info fields for each sample
 
 VCF_HEADER = '##fileformat=VCFv4.1\n##reference='+REFERENCE+'##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">\n##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n'
 
+DP_TOKENS = ['DP','DPU','DPI']	# in the order that we'll look for them
+
 def parseLine(splt):
 
 	#	check if we want to proceed..
@@ -163,15 +165,19 @@ def parseLine(splt):
 	if len(alt_split) > 1:
 		alt_alleles = alt_split
 
-	#	check INFO for DP first
-	if 'INFO' in colDict and 'DP=' in splt[colDict['INFO']]:
-		cov = int(re.findall(r"DP=[0-9]+",splt[colDict['INFO']])[0][3:])
-	#	check FORMAT/SAMPLE for DP second:
-	elif 'FORMAT' in colDict and len(colSamp):
-		format = splt[colDict['FORMAT']]+':'
-		if ':DP:' in format:
-			dpInd = format.split(':').index('DP')
-			cov   = int(splt[colSamp[0]].split(':')[dpInd])
+	#	cov
+	for dp_tok in DP_TOKENS:
+		#	check INFO for DP first
+		if 'INFO' in colDict and dp_tok+'=' in splt[colDict['INFO']]:
+			cov = int(re.findall(re.escape(dp_tok)+r"=[0-9]+",splt[colDict['INFO']])[0][3:])
+		#	check FORMAT/SAMPLE for DP second:
+		elif 'FORMAT' in colDict and len(colSamp):
+			format = splt[colDict['FORMAT']]+':'
+			if ':'+dp_tok+':' in format:
+				dpInd = format.split(':').index(dp_tok)
+				cov   = int(splt[colSamp[0]].split(':')[dpInd])
+		if cov != None:
+			break
 
 	#	check INFO for AF first
 	af = None
