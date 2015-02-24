@@ -695,7 +695,7 @@ def main():
 		if MAPTRACK != None:
 			v = venn3([set1, set2, set3], ('Unmappable', 'DP < '+str(DP_THRESH), 'AF < '+str(AF_THRESH)))
 		else:
-			v = venn2([set2, set3], ('DP < '+str(DP_THRESH), 'AF < '+str(AF_THRESH))))
+			v = venn2([set2, set3], ('DP < '+str(DP_THRESH), 'AF < '+str(AF_THRESH)))
 		mpl.figtext(0.5,0.95,tstr1,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 		mpl.figtext(0.5,0.03,tstr2,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 
