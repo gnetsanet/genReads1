@@ -596,7 +596,6 @@ def main():
 		#
 		#	try to identify a reason for FN variants:
 		#
-		print 'rawr',len(correctCov)
 		if len(correctCov):
 			covKeys = [n for n in correctCov.values() if n != None]
 			avg_dp = np.mean(covKeys)
