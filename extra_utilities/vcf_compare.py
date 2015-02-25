@@ -433,7 +433,6 @@ def main():
 		workflow_alts    = {}
 		colDict          = {}
 		omgomgomg = {}
-		nHeader = 0
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
@@ -487,8 +486,6 @@ def main():
 								workflowVariants.append(voi)
 							line_workflow += 1
 			else:
-				nHeader += 1
-				print nHeader
 				if line[1] != '#':
 					cols = line[1:-1].split('\t')
 					for i in xrange(len(cols)):
