@@ -408,8 +408,6 @@ def main():
 								correctQual[var]    = qual
 								correctTargLen[var] = targLen
 								line_golden += 1
-							else:
-								print 'are we golden?'
 
 						else:
 							nBelowMinRLen += 1
@@ -442,7 +440,6 @@ def main():
 					var  = (int(splt[1]),splt[3],splt[4])
 
 					if var in workflowHashed:
-						print 'are we working?'
 						continue
 					workflowHashed[var] = 1
 
@@ -465,6 +462,12 @@ def main():
 							else:
 								workflowVariants.append([var,[cov,af[0],qual,targLen]])
 							line_workflow += 1
+						else:
+							print 'rawr3: does this ever actually happen?'
+					else:
+						print 'rawr2: does this ever actually happen?'
+				else:
+					print 'rawr1: does this ever actually happen?'
 			else:
 				if line[1] != '#':
 					cols = line[1:-1].split('\t')
