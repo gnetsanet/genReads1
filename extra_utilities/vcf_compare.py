@@ -468,9 +468,9 @@ def main():
 					else:
 						print 'rawr2: does this ever actually happen?'
 				else:
-					if refName not in refDict:
-						refDict[refName] = 0
-					refDict[refName] += 1
+					if splt[0] not in refDict:
+						refDict[splt[0]] = 0
+					refDict[splt[0]] += 1
 			else:
 				if line[1] != '#':
 					cols = line[1:-1].split('\t')
