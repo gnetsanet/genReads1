@@ -433,6 +433,7 @@ def main():
 		workflow_alts    = {}
 		colDict          = {}
 		omgomgomg = {}
+		nHeader = 0
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
@@ -467,8 +468,8 @@ def main():
 									if voiH in omgomgomg:
 										continue
 									omgomgomg[voiH] = True
-
 									allSkipped = False
+
 									workflowVariants.append(voi)
 									workflow_alts[allVars[i]] = allVars
 								if allSkipped:
@@ -482,14 +483,12 @@ def main():
 									nCollisions += 1
 									continue
 								omgomgomg[voiH] = True
-								
+
 								workflowVariants.append(voi)
 							line_workflow += 1
-						else:
-							print 'rawr3: does this ever actually happen?'
-					else:
-						print 'rawr2: does this ever actually happen?'
 			else:
+				nHeader += 1
+				print nHeader
 				if line[1] != '#':
 					cols = line[1:-1].split('\t')
 					for i in xrange(len(cols)):
