@@ -305,6 +305,8 @@ def main():
 	set3 = []
 	varAdj = 0
 
+	nCollisions = 0
+
 	#
 	#
 	#	For each sequence in reference fasta...
@@ -470,7 +472,8 @@ def main():
 								voiH = (var,cov,af[0],qual,targLen)
 								omgomgomg[voiH] = True
 								if voiH in omgomgomg:
-									print 'rawr4: does this ever actually happen?'
+									continue
+									nCollisions += 1
 								workflowVariants.append(voi)
 							line_workflow += 1
 						else:
@@ -740,6 +743,8 @@ def main():
 	if FAST:
 		print "\nWarning! Running with '--fast' means that identical variants denoted differently between the two vcfs will not be detected! The values above may be lower than the true accuracy."
 	print '\n**********************************\n'
+
+	print 'jews:',nCollisions
 
 	#if MAPTRACK != None:
 	#	print 'mappability:'
