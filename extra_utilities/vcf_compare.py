@@ -408,6 +408,8 @@ def main():
 								correctQual[var]    = qual
 								correctTargLen[var] = targLen
 								line_golden += 1
+							else:
+								print 'are we golden?'
 
 						else:
 							nBelowMinRLen += 1
@@ -440,6 +442,7 @@ def main():
 					var  = (int(splt[1]),splt[3],splt[4])
 
 					if var in workflowHashed:
+						print 'are we working?'
 						continue
 					workflowHashed[var] = 1
 
@@ -601,10 +604,12 @@ def main():
 		#
 		if len(correctCov):
 			covKeys = [n for n in correctCov.values() if n != None]
-			avg_dp = np.mean(covKeys)
-			std_dp = np.std(covKeys)
 
-			DP_THRESH = int(avg_dp - 2 * std_dp)		# below this is unusually low
+			#avg_dp = np.mean(covKeys)
+			#std_dp = np.std(covKeys)
+			#DP_THRESH = int(avg_dp - 2 * std_dp)		# below this is unusually low
+
+			DP_THRESH = sorted(covKeys)[int(len(covKeys)/10)]
 			AF_THRESH = 0.3								# below this is a het variant with potentially low allele balance
 
 			venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
