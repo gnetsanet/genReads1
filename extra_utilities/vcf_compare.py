@@ -430,6 +430,7 @@ def main():
 		line_workflow    = 0
 		workflow_alts    = {}
 		colDict          = {}
+		omgomgomg = {}
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
@@ -458,13 +459,17 @@ def main():
 								allVars = [(var[0],var[1],n) for n in aa]
 								for i in xrange(len(allVars)):
 									voi = [allVars[i],[cov,af[i],qual,targLen]]
-									if voi in workflowVariants:
+									voiH = (allVars[i],cov,af[i],qual,targLen)
+									omgomgomg[voiH] = True
+									if voiH in omgomgomg:
 										print 'rawr1: does this ever actually happen?'
 									workflowVariants.append(voi)
 									workflow_alts[allVars[i]] = allVars
 							else:
 								voi = [var,[cov,af[0],qual,targLen]]
-								if voi in workflowVariants:
+								voiH = (var,cov,af[0],qual,targLen)
+								omgomgomg[voiH] = True
+								if voiH in omgomgomg:
 									print 'rawr4: does this ever actually happen?'
 								workflowVariants.append(voi)
 							line_workflow += 1
