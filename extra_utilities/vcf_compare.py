@@ -542,7 +542,7 @@ def main():
 		totalVariants = nPerfect + len(notFound)
 		if totalVariants == 0:
 			zfP += len(FPvariants)
-			ztW += line_golden
+			ztW += line_workflow
 			print '{0:.3f} (sec)'.format(time.time()-tt)
 			continue
 
