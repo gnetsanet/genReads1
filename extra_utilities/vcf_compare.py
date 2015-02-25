@@ -430,7 +430,6 @@ def main():
 		line_workflow    = 0
 		workflow_alts    = {}
 		colDict          = {}
-		refDict = {}
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
@@ -458,19 +457,21 @@ def main():
 							if len(aa):
 								allVars = [(var[0],var[1],n) for n in aa]
 								for i in xrange(len(allVars)):
-									workflowVariants.append([allVars[i],[cov,af[i],qual,targLen]])
+									voi = [allVars[i],[cov,af[i],qual,targLen]]
+									if voi in workflowVariants:
+										print 'rawr1: does this ever actually happen?'
+									workflowVariants.append(voi)
 									workflow_alts[allVars[i]] = allVars
 							else:
-								workflowVariants.append([var,[cov,af[0],qual,targLen]])
+								voi = [var,[cov,af[0],qual,targLen]]
+								if voi in workflowVariants:
+									print 'rawr4: does this ever actually happen?'
+								workflowVariants.append(voi)
 							line_workflow += 1
 						else:
 							print 'rawr3: does this ever actually happen?'
 					else:
 						print 'rawr2: does this ever actually happen?'
-				else:
-					if splt[0] not in refDict:
-						refDict[splt[0]] = 0
-					refDict[splt[0]] += 1
 			else:
 				if line[1] != '#':
 					cols = line[1:-1].split('\t')
@@ -481,7 +482,6 @@ def main():
 					if VCF_OUT and vcfo3_firstTime:
 						vcfo3_firstTime = False
 						vcfo3.write(line)
-		print refDict
 
 		#
 		#	Deduce which variants are FP / FN
