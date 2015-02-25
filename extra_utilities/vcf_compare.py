@@ -305,8 +305,6 @@ def main():
 	set3 = []
 	varAdj = 0
 
-	nCollisions = 0
-
 	#
 	#
 	#	For each sequence in reference fasta...
@@ -427,12 +425,11 @@ def main():
 		#
 		#	Parse relevant workflow variants
 		#
-		workflowHashed   = {}
 		workflowVariants = []
+		workflowHashed   = {}
 		line_workflow    = 0
 		workflow_alts    = {}
 		colDict          = {}
-		omgomgomg = {}
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
@@ -441,10 +438,6 @@ def main():
 				splt = line.split('\t')
 				if splt[0] == refName:
 					var  = (int(splt[1]),splt[3],splt[4])
-
-					if var in workflowHashed:
-						continue
-					workflowHashed[var] = 1
 
 					targInd = bisect.bisect(targRegionsFl,var[0])
 
@@ -464,24 +457,22 @@ def main():
 									voi = [allVars[i],[cov,af[i],qual,targLen]]
 
 									voiH = (allVars[i][0],allVars[i][1],allVars[i][2],cov,af[i],qual,targLen)
-									if voiH in omgomgomg:
+									if voiH in workflowHashed:
 										continue
-									omgomgomg[voiH] = True
+									workflowHashed[voiH] = True
 									allSkipped = False
 
 									workflowVariants.append(voi)
 									workflow_alts[allVars[i]] = allVars
 								if allSkipped:
-									nCollisions += 1
 									continue
 							else:
 								voi = [var,[cov,af[0],qual,targLen]]
 
 								voiH = (var[0],var[1],var[2],cov,af[0],qual,targLen)
-								if voiH in omgomgomg:
-									nCollisions += 1
+								if voiH in workflowHashed:
 									continue
-								omgomgomg[voiH] = True
+								workflowHashed[voiH] = True
 
 								workflowVariants.append(voi)
 							line_workflow += 1
@@ -748,8 +739,6 @@ def main():
 	if FAST:
 		print "\nWarning! Running with '--fast' means that identical variants denoted differently between the two vcfs will not be detected! The values above may be lower than the true accuracy."
 	print '\n**********************************\n'
-
-	print 'jews:',nCollisions
 
 	#if MAPTRACK != None:
 	#	print 'mappability:'
