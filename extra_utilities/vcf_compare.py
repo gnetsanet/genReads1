@@ -430,6 +430,7 @@ def main():
 		line_workflow    = 0
 		workflow_alts    = {}
 		colDict          = {}
+		refDict = {}
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
@@ -467,7 +468,9 @@ def main():
 					else:
 						print 'rawr2: does this ever actually happen?'
 				else:
-					print 'rawr1: does this ever actually happen?'
+					if refName not in refDict:
+						refDict[refName] = 0
+					refDict[refName] += 1
 			else:
 				if line[1] != '#':
 					cols = line[1:-1].split('\t')
@@ -478,6 +481,7 @@ def main():
 					if VCF_OUT and vcfo3_firstTime:
 						vcfo3_firstTime = False
 						vcfo3.write(line)
+		print refDict
 
 		#
 		#	Deduce which variants are FP / FN
