@@ -459,14 +459,18 @@ def main():
 
 							if len(aa):
 								allVars = [(var[0],var[1],n) for n in aa]
+								allSkipped = True
 								for i in xrange(len(allVars)):
 									voi = [allVars[i],[cov,af[i],qual,targLen]]
 									voiH = (allVars[i],cov,af[i],qual,targLen)
 									omgomgomg[voiH] = True
 									if voiH in omgomgomg:
-										print 'rawr1: does this ever actually happen?'
+										continue
+									allSkipped = False
 									workflowVariants.append(voi)
 									workflow_alts[allVars[i]] = allVars
+								if allSkipped:
+									nCollisions += 1
 							else:
 								voi = [var,[cov,af[0],qual,targLen]]
 								voiH = (var,cov,af[0],qual,targLen)
