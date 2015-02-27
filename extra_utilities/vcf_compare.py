@@ -78,6 +78,8 @@ PARSER.add_option('-o', help='* Output Prefix',   dest='OUTF', action='store', m
 PARSER.add_option('-m', help='Mappability Track', dest='MTRK', action='store', metavar='<tracks.dat>')
 PARSER.add_option('-t', help='Targetted Regions', dest='TREG', action='store', metavar='<regions.bed>')
 PARSER.add_option('-T', help='Min Region Len',    dest='MTRL', action='store', metavar='<int>')
+PARSER.add_option('-c', help='Coverage Filter Threshold [%default]',       dest='DP_THRESH', default=15, action='store', metavar='<int>')
+PARSER.add_option('-c', help='Allele Freq Filter Threshold [%default]',    dest='AF_THRESH', default=0.3, action='store', metavar='<float>')
 
 PARSER.add_option('--vcf-out',   help="Output Match/FN/FP variants [%default]",       dest='VCF_OUT', default=False, action='store_true')
 PARSER.add_option('--no-plot',   help="No plotting [%default]",                       dest='NO_PLOT', default=False, action='store_true')
@@ -93,6 +95,8 @@ WORKFLOW_VCF = OPTS.WVCF
 OUT_PREFIX   = OPTS.OUTF
 MAPTRACK     = OPTS.MTRK
 BEDFILE      = OPTS.TREG
+DP_THRESH    = int(OPTS.DP_THRESH)
+AF_THRESH    = float(OPTS.AF_THRESH)
 
 VCF_OUT      = OPTS.VCF_OUT
 NO_PLOT      = OPTS.NO_PLOT
@@ -126,6 +130,8 @@ if NO_PLOT == False:
 	matplotlib.use('Agg')
 	import matplotlib.pyplot as mpl
 	from matplotlib_venn import venn2, venn3
+	import warnings
+	warnings.filterwarnings("ignore", category=UserWarning, module='matplotlib_venn')
 
 AF_STEPS = 20
 AF_KEYS  = np.linspace(0.0,1.0,AF_STEPS+1)
@@ -613,11 +619,6 @@ def main():
 		#
 		#	try to identify a reason for FN variants:
 		#
-
-		#covKeys = [n for n in correctCov.values() if n != None]
-		#DP_THRESH = sorted(covKeys)[int(len(covKeys)/10)]
-		DP_THRESH = 15
-		AF_THRESH = 0.3								# below this is a het variant with potentially low allele balance
 
 		venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
 		for i in xrange(len(notFound)):
