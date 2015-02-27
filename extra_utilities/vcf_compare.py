@@ -613,15 +613,13 @@ def main():
 		#
 		#	try to identify a reason for FN variants:
 		#
+
+		#DP_THRESH = sorted(covKeys)[int(len(covKeys)/10)]
+		DP_THRESH = 15
+		AF_THRESH = 0.3								# below this is a het variant with potentially low allele balance
+
 		if len(correctCov):
 			covKeys = [n for n in correctCov.values() if n != None]
-
-			#avg_dp = np.mean(covKeys)
-			#std_dp = np.std(covKeys)
-			#DP_THRESH = int(avg_dp - 2 * std_dp)		# below this is unusually low
-
-			DP_THRESH = sorted(covKeys)[int(len(covKeys)/10)]
-			AF_THRESH = 0.3								# below this is a het variant with potentially low allele balance
 
 			venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
 
