@@ -703,9 +703,9 @@ def main():
 
 		if len(set1): s1 = 'Unmappable'
 		else: s1 = ''
-		if len(set1): s2 = 'DP < '+str(DP_THRESH)
+		if len(set2): s2 = 'DP < '+str(DP_THRESH)
 		else: s2 = ''
-		if len(set1): s3 = 'AF < '+str(AF_THRESH)
+		if len(set3): s3 = 'AF < '+str(AF_THRESH)
 		else: s3 = ''
 
 		mpl.figure(0)
