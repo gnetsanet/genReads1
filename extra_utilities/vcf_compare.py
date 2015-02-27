@@ -79,7 +79,7 @@ PARSER.add_option('-m', help='Mappability Track', dest='MTRK', action='store', m
 PARSER.add_option('-t', help='Targetted Regions', dest='TREG', action='store', metavar='<regions.bed>')
 PARSER.add_option('-T', help='Min Region Len',    dest='MTRL', action='store', metavar='<int>')
 PARSER.add_option('-c', help='Coverage Filter Threshold [%default]',       dest='DP_THRESH', default=15, action='store', metavar='<int>')
-PARSER.add_option('-c', help='Allele Freq Filter Threshold [%default]',    dest='AF_THRESH', default=0.3, action='store', metavar='<float>')
+PARSER.add_option('-a', help='Allele Freq Filter Threshold [%default]',    dest='AF_THRESH', default=0.3, action='store', metavar='<float>')
 
 PARSER.add_option('--vcf-out',   help="Output Match/FN/FP variants [%default]",       dest='VCF_OUT', default=False, action='store_true')
 PARSER.add_option('--no-plot',   help="No plotting [%default]",                       dest='NO_PLOT', default=False, action='store_true')
