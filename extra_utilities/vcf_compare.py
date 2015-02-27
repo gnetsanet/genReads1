@@ -700,13 +700,20 @@ def main():
 		set2 = set(set2)
 		set3 = set(set3)
 
+		if len(set1): s1 = 'Unmappable'
+		else: s1 = ''
+		if len(set1): s2 = 'DP < '+str(DP_THRESH)
+		else: s2 = ''
+		if len(set1): s3 = 'AF < '+str(AF_THRESH)
+		else: s3 = ''
+
 		mpl.figure(0)
 		tstr1 = 'False Negative Variants (Missed Detections)'
 		tstr2 = str(nDetected)+' / '+str(znF)+' FN variants categorized'
 		if MAPTRACK != None:
-			v = venn3([set1, set2, set3], ('Unmappable', 'DP < '+str(DP_THRESH), 'AF < '+str(AF_THRESH)))
+			v = venn3([set1, set2, set3], (s1, s2, s3))
 		else:
-			v = venn2([set2, set3], ('DP < '+str(DP_THRESH), 'AF < '+str(AF_THRESH)))
+			v = venn2([set2, set3], (s2, s3))
 		mpl.figtext(0.5,0.95,tstr1,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 		mpl.figtext(0.5,0.03,tstr2,fontdict={'size':14,'weight':'bold'},horizontalalignment='center')
 
