@@ -614,52 +614,49 @@ def main():
 		#	try to identify a reason for FN variants:
 		#
 
+		#covKeys = [n for n in correctCov.values() if n != None]
 		#DP_THRESH = sorted(covKeys)[int(len(covKeys)/10)]
 		DP_THRESH = 15
 		AF_THRESH = 0.3								# below this is a het variant with potentially low allele balance
 
-		if len(correctCov):
-			covKeys = [n for n in correctCov.values() if n != None]
+		venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
+		for i in xrange(len(notFound)):
+			var = notFound[i]
 
-			venn_data = [[0,0,0] for n in notFound]		# [i] = (unmappable, low cov, low het)
+			#	mappability?
+			if MAPTRACK != None:
+				if mappability_tracks[refName][var[0]]:
+					mappability_vs_FN[1] += 1
+					venn_data[i][0] = 1
+				else:
+					mappability_vs_FN[0] += 1
 
-			for i in xrange(len(notFound)):
-				var = notFound[i]
+			#	coverage?
+			if var in correctCov:
+				c = correctCov[var]
+				if c != None:
+					if c not in coverage_vs_FN:
+						coverage_vs_FN[c] = 0
+					coverage_vs_FN[c] += 1
+					if c < DP_THRESH:
+						venn_data[i][1] = 1
 
-				#	mappability?
-				if MAPTRACK != None:
-					if mappability_tracks[refName][var[0]]:
-						mappability_vs_FN[1] += 1
-						venn_data[i][0] = 1
-					else:
-						mappability_vs_FN[0] += 1
+			#	heterozygous genotype messing things up?
+			if var in correctAF:
+				a = correctAF[var]
+				if a != None:
+					a = AF_KEYS[quantize_AF(a)]
+					if a not in alleleBal_vs_FN:
+						alleleBal_vs_FN[a] = 0
+					alleleBal_vs_FN[a] += 1
+					if a < AF_THRESH:
+						venn_data[i][2] = 1
 
-				#	coverage?
-				if var in correctCov:
-					c = correctCov[var]
-					if c != None:
-						if c not in coverage_vs_FN:
-							coverage_vs_FN[c] = 0
-						coverage_vs_FN[c] += 1
-						if c < DP_THRESH:
-							venn_data[i][1] = 1
-
-				#	heterozygous genotype messing things up?
-				if var in correctAF:
-					a = correctAF[var]
-					if a != None:
-						a = AF_KEYS[quantize_AF(a)]
-						if a not in alleleBal_vs_FN:
-							alleleBal_vs_FN[a] = 0
-						alleleBal_vs_FN[a] += 1
-						if a < AF_THRESH:
-							venn_data[i][2] = 1
-
-			for i in xrange(len(notFound)):
-				if venn_data[i][0]: set1.append(i+varAdj)
-				if venn_data[i][1]: set2.append(i+varAdj)
-				if venn_data[i][2]: set3.append(i+varAdj)
-			varAdj += len(notFound)
+		for i in xrange(len(notFound)):
+			if venn_data[i][0]: set1.append(i+varAdj)
+			if venn_data[i][1]: set2.append(i+varAdj)
+			if venn_data[i][2]: set3.append(i+varAdj)
+		varAdj += len(notFound)
 
 		#
 		#	if desired, write out vcf files. (This step mangles the FPvariants lists, don't use those after this!)
