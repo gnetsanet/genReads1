@@ -154,8 +154,9 @@ DP_TOKENS = ['DP','DPU','DPI']	# in the order that we'll look for them
 def parseLine(splt):
 
 	#	check if we want to proceed..
+	ra = splt[colDict['REF']]
 	aa = splt[colDict['ALT']]
-	if not(INCLUDE_HOMS) and (aa == '.' or aa == ''):
+	if not(INCLUDE_HOMS) and (aa == '.' or aa == '' or aa == ra):
 		return None
 	if not(INCLUDE_FAIL) and (splt[colDict['FILTER']] != 'PASS' and splt[colDict['FILTER']] != '.'):
 		return None
