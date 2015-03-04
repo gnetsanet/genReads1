@@ -403,22 +403,30 @@ def main():
 							(cov, qual, aa, af) = pl_out
 
 							if var not in correctHashed:
+								areWeUnique = False
 								if len(aa):
 									allVars = [(var[0],var[1],n) for n in aa]
 									for i in xrange(len(allVars)):
+										if allVars[i] in correctHashed:
+											continue
+										areWeUnique = True
 										correctHashed[allVars[i]] = 1
 										correct_alts[allVars[i]]  = allVars
 								else:
+									if var in correctHashed:
+										continue
+									areWeUnique = True
 									correctHashed[var] = 1
 
-								if cov != None:
-									correctCov[var] = cov
-								correctAF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
-								correctQual[var]    = qual
-								correctTargLen[var] = targLen
-								line_golden += 1
+								if areWeUnique:
+									if cov != None:
+										correctCov[var] = cov
+									correctAF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
+									correctQual[var]    = qual
+									correctTargLen[var] = targLen
+									line_golden += 1
 							else:
-								print 'WHY NOT?!'
+								continue
 
 						else:
 							nBelowMinRLen += 1
@@ -501,7 +509,6 @@ def main():
 		#
 		#	Deduce which variants are FP / FN
 		#
-		print 'rawr?!', len(correctHashed)
 		nPerfect = 0
 		FPvariants = []
 		alts_to_ignore = []
