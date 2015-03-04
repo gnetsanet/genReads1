@@ -317,6 +317,7 @@ def main():
 	#	For each sequence in reference fasta...
 	#
 	#
+	print ref_inds
 	for n_RI in ref_inds:
 		refName = n_RI[0]
 
@@ -499,6 +500,7 @@ def main():
 		#
 		#	Deduce which variants are FP / FN
 		#
+		print 'rawr?!', len(correctHashed)
 		nPerfect = 0
 		FPvariants = []
 		alts_to_ignore = []
