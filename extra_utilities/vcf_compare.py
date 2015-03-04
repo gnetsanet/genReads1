@@ -383,8 +383,8 @@ def main():
 		colDict = {}
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
-				if ',' in line and refName == 'chr1':
-					print line
+				#if ',' in line and refName == 'chr1':
+				#	print line
 				if len(colDict) == 0:
 					print '\n\nError: Golden VCF has no header?\n\n'
 					exit(1)
