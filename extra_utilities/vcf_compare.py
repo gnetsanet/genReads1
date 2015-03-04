@@ -381,8 +381,13 @@ def main():
 		line_golden     = 0
 		global colDict
 		colDict = {}
+		nLine = 0
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
+				if ',' in line:
+					continue
+				nLine += 1
+				print nLine
 				if len(colDict) == 0:
 					print '\n\nError: Golden VCF has no header?\n\n'
 					exit(1)
@@ -397,7 +402,6 @@ def main():
 							
 							pl_out = parseLine(splt)
 							if pl_out == None:
-								print 'rawr?!!!'
 								continue
 							(cov, qual, aa, af) = pl_out
 
