@@ -391,8 +391,10 @@ def main():
 				
 				ddddd = len(correctHashed)-prevch
 				if ddddd != 1:
+					print len(correctHashed), ddddd
 					print prevL
 					print line
+					print ''
 				prevch = len(correctHashed)
 				prevL = line
 
