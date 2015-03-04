@@ -382,8 +382,6 @@ def main():
 		line_golden     = 0
 		global colDict
 		colDict = {}
-		prevch = 0
-		prevL = ''
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
 				if len(colDict) == 0:
@@ -391,15 +389,6 @@ def main():
 					exit(1)
 				splt = line.split('\t')
 				if splt[0] == refName:
-
-					#ddddd = len(correctHashed)-prevch
-					#if ddddd != 1:
-					#	print len(correctHashed), ddddd
-					#	print prevL
-					#	print line
-					#	print ''
-					#prevch = len(correctHashed)
-					#prevL = line
 
 					var  = (int(splt[1]),splt[3],splt[4])
 					targInd = bisect.bisect(targRegionsFl,var[0])
@@ -413,20 +402,9 @@ def main():
 								continue
 							(cov, qual, aa, af) = pl_out
 
-							if var[0] == 13183225:
-								print '***'
-								print line
-								print var
-								print pl_out
-								print '***'
-
 							if var not in correctHashed:
 								if len(aa):
 									allVars = [(var[0],var[1],n) for n in aa]
-									#print '\n'
-									#print line
-									#print allVars
-									#print '\n'
 									for i in xrange(len(allVars)):
 										correctHashed[allVars[i]] = 1
 										correct_alts[allVars[i]]  = allVars
@@ -439,6 +417,8 @@ def main():
 								correctQual[var]    = qual
 								correctTargLen[var] = targLen
 								line_golden += 1
+							else:
+								print 'WHY NOT?!'
 
 						else:
 							nBelowMinRLen += 1
