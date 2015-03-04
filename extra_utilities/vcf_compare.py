@@ -386,23 +386,21 @@ def main():
 		prevL = ''
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
-				#if ',' in line and refName == 'chr1':
-				#	print line
-				
-				ddddd = len(correctHashed)-prevch
-				if ddddd != 1:
-					print len(correctHashed), ddddd
-					print prevL
-					print line
-					print ''
-				prevch = len(correctHashed)
-				prevL = line
-
 				if len(colDict) == 0:
 					print '\n\nError: Golden VCF has no header?\n\n'
 					exit(1)
 				splt = line.split('\t')
 				if splt[0] == refName:
+
+					ddddd = len(correctHashed)-prevch
+					if ddddd != 1:
+						print len(correctHashed), ddddd
+						print prevL
+						print line
+						print ''
+					prevch = len(correctHashed)
+					prevL = line
+					
 					var  = (int(splt[1]),splt[3],splt[4])
 					targInd = bisect.bisect(targRegionsFl,var[0])
 
