@@ -381,8 +381,11 @@ def main():
 		line_golden     = 0
 		global colDict
 		colDict = {}
+		nLine = 0
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
+				nLine += 1
+				print nLine
 				if len(colDict) == 0:
 					print '\n\nError: Golden VCF has no header?\n\n'
 					exit(1)
@@ -404,13 +407,9 @@ def main():
 								if len(aa):
 									allVars = [(var[0],var[1],n) for n in aa]
 									for i in xrange(len(allVars)):
-										if allVars[i] in correctHashed:
-											print 'rawr1!!!'
 										correctHashed[allVars[i]] = 1
 										correct_alts[allVars[i]]  = allVars
 								else:
-									if var in correctHashed:
-										print 'rawr2!!!'
 									correctHashed[var] = 1
 
 								if cov != None:
@@ -419,8 +418,6 @@ def main():
 								correctQual[var]    = qual
 								correctTargLen[var] = targLen
 								line_golden += 1
-							else:
-								'rawr0!!!'
 
 						else:
 							nBelowMinRLen += 1
