@@ -392,15 +392,15 @@ def main():
 				splt = line.split('\t')
 				if splt[0] == refName:
 
-					ddddd = len(correctHashed)-prevch
-					if ddddd != 1:
-						print len(correctHashed), ddddd
-						print prevL
-						print line
-						print ''
-					prevch = len(correctHashed)
-					prevL = line
-					
+					#ddddd = len(correctHashed)-prevch
+					#if ddddd != 1:
+					#	print len(correctHashed), ddddd
+					#	print prevL
+					#	print line
+					#	print ''
+					#prevch = len(correctHashed)
+					#prevL = line
+
 					var  = (int(splt[1]),splt[3],splt[4])
 					targInd = bisect.bisect(targRegionsFl,var[0])
 
@@ -412,6 +412,13 @@ def main():
 							if pl_out == None:
 								continue
 							(cov, qual, aa, af) = pl_out
+
+							if var[0] == 13183225:
+								print '***'
+								print line
+								print var
+								print pl_out
+								print '***'
 
 							if var not in correctHashed:
 								if len(aa):
