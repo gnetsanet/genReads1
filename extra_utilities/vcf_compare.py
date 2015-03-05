@@ -479,10 +479,10 @@ def main():
 								for i in xrange(len(allVars)):
 									voi = [allVars[i],[cov,af[i],qual,targLen]]
 
-									voiH = (allVars[i][0],allVars[i][1],allVars[i][2],cov,af[i],qual,targLen)
-									if voiH in workflowHashed:
+									#voiH = (allVars[i][0],allVars[i][1],allVars[i][2],cov,af[i],qual,targLen)
+									if var in workflowHashed:
 										continue
-									workflowHashed[voiH] = True
+									workflowHashed[var] = True
 									allSkipped = False
 
 									workflowVariants.append(voi)
@@ -492,10 +492,10 @@ def main():
 							else:
 								voi = [var,[cov,af[0],qual,targLen]]
 
-								voiH = (var[0],var[1],var[2],cov,af[0],qual,targLen)
-								if voiH in workflowHashed:
+								#voiH = (var[0],var[1],var[2],cov,af[0],qual,targLen)
+								if var in workflowHashed:
 									continue
-								workflowHashed[voiH] = True
+								workflowHashed[var] = True
 
 								workflowVariants.append(voi)
 							line_workflow += 1
@@ -509,7 +509,7 @@ def main():
 					if VCF_OUT and vcfo3_firstTime:
 						vcfo3_firstTime = False
 						vcfo3.write(line)
-						
+
 		print '\nRAWRG:',len(correctHashed)
 		print 'RAWRW:',len(workflowHashed)
 
