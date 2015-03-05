@@ -509,6 +509,9 @@ def main():
 					if VCF_OUT and vcfo3_firstTime:
 						vcfo3_firstTime = False
 						vcfo3.write(line)
+						
+		print '\nRAWRG:',len(correctHashed)
+		print 'RAWRW:',len(workflowHashed)
 
 		#
 		#	Deduce which variants are FP / FN
