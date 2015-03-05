@@ -384,8 +384,6 @@ def main():
 		colDict = {}
 		for line in open(GOLDEN_VCF,'r'):
 			if line[0] != '#':
-				if ',' in line:
-					continue
 				if len(colDict) == 0:
 					print '\n\nError: Golden VCF has no header?\n\n'
 					exit(1)
@@ -453,8 +451,6 @@ def main():
 		colDict          = {}
 		for line in open(WORKFLOW_VCF,'r'):
 			if line[0] != '#':
-				if ',' in line:
-					continue
 				if len(colDict) == 0:
 					print '\n\nError: Workflow VCF has no header?\n\n'
 					exit(1)
