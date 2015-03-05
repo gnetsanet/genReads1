@@ -493,10 +493,12 @@ def main():
 
 		#
 		#
-		totalVariants = nPerfect + len(notFound)
-		if totalVariants == 0:
+		#
+		totalGoldenVariants   = nPerfect + len(notFound)
+		totalWorkflowVariants = nPerfect + len(FPvariants)
+		if totalGoldenVariants == 0:
 			zfP += len(FPvariants)
-			ztW += workflowUnique
+			ztW += totalWorkflowVariants
 			print '{0:.3f} (sec)'.format(time.time()-tt)
 			continue
 
@@ -563,8 +565,8 @@ def main():
 		#
 		#	Tally up errors and whatnot
 		#
-		ztV += totalVariants
-		ztW += workflowUnique
+		ztV += totalGoldenVariants
+		ztW += totalWorkflowVariants
 		znP += nPerfect
 		zfP += len(FPvariants)
 		znF += len(notFound)
