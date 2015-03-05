@@ -145,14 +145,14 @@ def quantize_AF(af):
 	else:
 		return int(af*AF_STEPS)
 
-colDict = {}	# [col_name] = col_index
-colSamp = []	# list of indices of columns containing info fields for each sample present
+#colDict = {}	# [col_name] = col_index
+#colSamp = []	# list of indices of columns containing info fields for each sample present
 
 VCF_HEADER = '##fileformat=VCFv4.1\n##reference='+REFERENCE+'##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">\n##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n'
 
 DP_TOKENS = ['DP','DPU','DPI']	# in the order that we'll look for them
 
-def parseLine(splt,colDict):
+def parseLine(splt,colDict,colSamp):
 
 	#	check if we want to proceed..
 	ra = splt[colDict['REF']]
@@ -213,9 +213,7 @@ def parseLine(splt,colDict):
 
 	return (cov, qual, alt_alleles, alt_freqs)
 
-#
-#
-#
+
 def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	v_Hashed   = {}
 	v_Alts     = {}
@@ -225,7 +223,8 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	v_TargLen  = {}
 	nBelowMinRLen   = 0
 	line_unique     = 0
-	colDict = {}
+	colDict    = {}
+	colSamp    = []
 	for line in open(VCF_FILENAME,'r'):
 		if line[0] != '#':
 			if len(colDict) == 0:
@@ -241,7 +240,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 					targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
 					if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 						
-						pl_out = parseLine(splt,colDict)
+						pl_out = parseLine(splt,colDict,colSamp)
 						if pl_out == None:
 							continue
 						(cov, qual, aa, af) = pl_out
@@ -619,10 +618,10 @@ def main():
 		varAdj += len(notFound)
 
 		#
-		#	if desired, write out vcf files. (This step mangles the FPvariants lists, don't use those after this!)
+		#	if desired, write out vcf files.
 		#
 		notFound   = sorted(notFound)
-		FPvariants = sorted([n[0] for n in FPvariants])
+		FPvariants = sorted(FPvariants)
 		if VCF_OUT:
 			for line in open(GOLDEN_VCF,'r'):
 				if line[0] != '#':
