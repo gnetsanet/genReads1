@@ -216,7 +216,7 @@ def parseLine(splt):
 #
 #
 #
-def parseVCF(VCF_FILENAME,targRegionsFl,outFile,outBool):
+def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	v_Hashed   = {}
 	v_Alts     = {}
 	v_Cov      = {}
@@ -445,8 +445,8 @@ def main():
 		tt = time.time()
 
 		global colDict
-		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique)        = parseVCF(GOLDEN_VCF, targRegionsFl, vcfo2, vcfo2_firstTime)
-		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique) = parseVCF(WORKFLOW_VCF, targRegionsFl, vcfo3, vcfo3_firstTime)
+		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique)        = parseVCF(GOLDEN_VCF, refName, targRegionsFl, vcfo2, vcfo2_firstTime)
+		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique) = parseVCF(WORKFLOW_VCF, refName, targRegionsFl, vcfo3, vcfo3_firstTime)
 
 		print '\nRAWRG:',len(correctHashed)
 		print 'RAWRW:',len(workflowHashed)
