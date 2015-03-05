@@ -56,6 +56,7 @@ def decompressTrack(ct):
 	for i in xrange(len(dc)):
 		outBA.extend(REV_EIGHTBIT[dc[i]])
 	return outBA[:ct[0]]
+
 #
 #
 #
@@ -212,23 +213,95 @@ def parseLine(splt):
 
 	return (cov, qual, alt_alleles, alt_freqs)
 
+#
+#
+#
+def parseVCF(VCF_FILENAME,targRegionsFl,outFile,outBool):
+	v_Hashed   = {}
+	v_Alts     = {}
+	v_Cov      = {}
+	v_AF       = {}
+	v_Qual     = {}
+	v_TargLen  = {}
+	nBelowMinRLen   = 0
+	line_unique     = 0
+	colDict = {}
+	for line in open(VCF_FILENAME,'r'):
+		if line[0] != '#':
+			if len(colDict) == 0:
+				print '\n\nError: VCF has no header?\n'+VCF_FILENAME+'\n\n'
+				exit(1)
+			splt = line.split('\t')
+			if splt[0] == refName:
+
+				var  = (int(splt[1]),splt[3],splt[4])
+				targInd = bisect.bisect(targRegionsFl,var[0])
+
+				if targInd%2 == 1:
+					targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
+					if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
+						
+						pl_out = parseLine(splt)
+						if pl_out == None:
+							continue
+						(cov, qual, aa, af) = pl_out
+
+						if var not in v_Hashed:
+							areWeUnique = False
+							if len(aa):
+								allVars = [(var[0],var[1],n) for n in aa]
+								for i in xrange(len(allVars)):
+									if allVars[i] in v_Hashed:
+										continue
+									areWeUnique = True
+									v_Hashed[allVars[i]] = 1
+									v_Alts[allVars[i]]  = allVars
+							else:
+								if var in v_Hashed:
+									continue
+								areWeUnique = True
+								v_Hashed[var] = 1
+
+							if areWeUnique:
+								if cov != None:
+									v_Cov[var] = cov
+								v_AF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
+								v_Qual[var]    = qual
+								v_TargLen[var] = targLen
+								line_unique += 1
+						else:
+							continue
+
+					else:
+						nBelowMinRLen += 1
+		else:
+			if line[1] != '#':
+				cols = line[1:-1].split('\t')
+				for i in xrange(len(cols)):
+					if 'FORMAT' in colDict:
+						colSamp.append(i)
+					colDict[cols[i]] = i
+				if VCF_OUT and outBool:
+					outBool = False
+					outFile.write(line)
+
+	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique)
+
+
 def condenseAlts(listIn,altsList,FNorFP):
 	to_condense   = {}
 	ext_info_dict = {}
 	for i in xrange(len(listIn)):
-		if FNorFP: var = listIn[i]
-		else: [var,extra_info] = listIn[i]
+		var = listIn[i]
 		if var in altsList:
 			concat = (var[0],var[1],','.join([n[2] for n in altsList[var]]))
-			if not FNorFP: ext_info_dict[concat] = extra_info
 			if concat not in to_condense:
 				to_condense[concat] = []
 			to_condense[concat].append(i)
 	delList = [j for i in to_condense.values() for j in i]
 	outList = [listIn[i] for i in xrange(len(listIn)) if i not in delList]
 	for n in to_condense.keys():
-		if FNorFP: outList.append(n)
-		else: outList.append([n,ext_info_dict[n]])
+		outList.append(n)
 	return outList
 
 
@@ -299,9 +372,13 @@ def main():
 	#
 	#	init vcf output, if desired
 	#
+	vcfo2 = None
+	vcfo3 = None
 	if VCF_OUT:
 		vcfo2 = open(OUT_PREFIX+'_FN.vcf','w')
 		vcfo3 = open(OUT_PREFIX+'_FP.vcf','w')
+		global vcfo2_firstTime
+		global vcfo3_firstTime
 		vcfo2_firstTime = True
 		vcfo3_firstTime = True
 
@@ -319,12 +396,8 @@ def main():
 	#
 	#
 	for n_RI in ref_inds:
-		refName = n_RI[0]
 
-		#
-		#	Read reference sequence we're currently interested in
-		#
-		#	assumes fasta file is sane and has '\n' characters within long sequences
+		refName = n_RI[0]
 		if FAST == False:
 			f.seek(n_RI[1])
 			print 'reading '+refName+'...',
@@ -363,148 +436,15 @@ def main():
 			targRegionsFl = [-1,MAX_VAL+1]
 
 		#
-		#	It begins...
+		#	Parse vcf files
 		#
 		sys.stdout.write('comparing variation in '+refName+'... ')
 		sys.stdout.flush()
 		tt = time.time()
 
-		#
-		#	Parse relevant golden variants
-		#
-		correctHashed   = {}
-		correct_alts    = {}
-		correctCov      = {}
-		correctAF       = {}
-		correctQual     = {}
-		correctTargLen  = {}
-		nBelowMinRLen   = 0
-		line_golden     = 0
 		global colDict
-		colDict = {}
-		for line in open(GOLDEN_VCF,'r'):
-			if line[0] != '#':
-				if len(colDict) == 0:
-					print '\n\nError: Golden VCF has no header?\n\n'
-					exit(1)
-				splt = line.split('\t')
-				if splt[0] == refName:
-
-					var  = (int(splt[1]),splt[3],splt[4])
-					targInd = bisect.bisect(targRegionsFl,var[0])
-
-					if targInd%2 == 1:
-						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
-						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
-							
-							pl_out = parseLine(splt)
-							if pl_out == None:
-								continue
-							(cov, qual, aa, af) = pl_out
-
-							if var not in correctHashed:
-								areWeUnique = False
-								if len(aa):
-									allVars = [(var[0],var[1],n) for n in aa]
-									for i in xrange(len(allVars)):
-										if allVars[i] in correctHashed:
-											continue
-										areWeUnique = True
-										correctHashed[allVars[i]] = 1
-										correct_alts[allVars[i]]  = allVars
-								else:
-									if var in correctHashed:
-										continue
-									areWeUnique = True
-									correctHashed[var] = 1
-
-								if areWeUnique:
-									if cov != None:
-										correctCov[var] = cov
-									correctAF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
-									correctQual[var]    = qual
-									correctTargLen[var] = targLen
-									line_golden += 1
-							else:
-								continue
-
-						else:
-							nBelowMinRLen += 1
-			else:
-				if line[1] != '#':
-					cols = line[1:-1].split('\t')
-					for i in xrange(len(cols)):
-						if 'FORMAT' in colDict:
-							colSamp.append(i)
-						colDict[cols[i]] = i
-					if VCF_OUT and vcfo2_firstTime:
-						vcfo2_firstTime = False
-						vcfo2.write(line)
-
-		#
-		#	Parse relevant workflow variants
-		#
-		workflowVariants = []
-		workflowHashed   = {}
-		line_workflow    = 0
-		workflow_alts    = {}
-		colDict          = {}
-		for line in open(WORKFLOW_VCF,'r'):
-			if line[0] != '#':
-				if len(colDict) == 0:
-					print '\n\nError: Workflow VCF has no header?\n\n'
-					exit(1)
-				splt = line.split('\t')
-				if splt[0] == refName:
-					var  = (int(splt[1]),splt[3],splt[4])
-
-					targInd = bisect.bisect(targRegionsFl,var[0])
-
-					if targInd%2 == 1:
-						targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
-						if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
-							
-							pl_out = parseLine(splt)
-							if pl_out == None:
-								continue
-							(cov, qual, aa, af) = pl_out
-
-							if len(aa):
-								allVars = [(var[0],var[1],n) for n in aa]
-								allSkipped = True
-								for i in xrange(len(allVars)):
-									voi = [allVars[i],[cov,af[i],qual,targLen]]
-
-									#voiH = (allVars[i][0],allVars[i][1],allVars[i][2],cov,af[i],qual,targLen)
-									if var in workflowHashed:
-										continue
-									workflowHashed[var] = True
-									allSkipped = False
-
-									workflowVariants.append(voi)
-									workflow_alts[allVars[i]] = allVars
-								if allSkipped:
-									continue
-							else:
-								voi = [var,[cov,af[0],qual,targLen]]
-
-								#voiH = (var[0],var[1],var[2],cov,af[0],qual,targLen)
-								if var in workflowHashed:
-									continue
-								workflowHashed[var] = True
-
-								workflowVariants.append(voi)
-							line_workflow += 1
-			else:
-				if line[1] != '#':
-					cols = line[1:-1].split('\t')
-					for i in xrange(len(cols)):
-						if 'FORMAT' in colDict:
-							colSamp.append(i)
-						colDict[cols[i]] = i
-					if VCF_OUT and vcfo3_firstTime:
-						vcfo3_firstTime = False
-						vcfo3.write(line)
+		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique)        = parseVCF(GOLDEN_VCF, targRegionsFl, vcfo2, vcfo2_firstTime)
+		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique) = parseVCF(WORKFLOW_VCF, targRegionsFl, vcfo3, vcfo3_firstTime)
 
 		print '\nRAWRG:',len(correctHashed)
 		print 'RAWRW:',len(workflowHashed)
@@ -515,27 +455,27 @@ def main():
 		nPerfect = 0
 		FPvariants = []
 		alts_to_ignore = []
-		for [var,extraInfo] in workflowVariants:
+		for var in sorted(workflowHashed.keys()):
 			if var in correctHashed:
 				nPerfect += 1
 				if correctHashed[var] != 3:
 					correctHashed[var] = 2
-				if var in correct_alts:				# ignore golden alts if one of them was found
+				if var in correctAlts:				# ignore golden alts if one of them was found
 					alreadySeen = True
-					for v2 in correct_alts[var]:
+					for v2 in correctAlts[var]:
 						if correctHashed[v2] != 3:
 							correctHashed[v2] = 3
 							alreadySeen = False
 					if alreadySeen:
 						nPerfect -= 1
-				if var in workflow_alts:
-					alts_to_ignore.extend(workflow_alts[var])
+				if var in workflowAlts:
+					alts_to_ignore.extend(workflowAlts[var])
 			else:
-				FPvariants.append([var,extraInfo])
+				FPvariants.append(var)
 
 		#	remove any trace of workflow variants who were not found, but whose alternate was
 		for i in xrange(len(FPvariants)-1,-1,-1):
-			if FPvariants[i][0] in alts_to_ignore:
+			if FPvariants[i] in alts_to_ignore:
 				del FPvariants[i]
 		
 		# correctHashed[var] = 1: were not found
@@ -547,15 +487,15 @@ def main():
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		notFound   = condenseAlts(notFound,correct_alts,True)
-		FPvariants = condenseAlts(FPvariants,workflow_alts,False)
+		notFound   = condenseAlts(notFound,correctAlts)
+		FPvariants = condenseAlts(FPvariants,workflowAlts)
 
 		#
 		#
 		totalVariants = nPerfect + len(notFound)
 		if totalVariants == 0:
 			zfP += len(FPvariants)
-			ztW += line_workflow
+			ztW += workflowUnique
 			print '{0:.3f} (sec)'.format(time.time()-tt)
 			continue
 
@@ -567,7 +507,7 @@ def main():
 			delList_j = []
 			regionsToCheck = []
 			for i in xrange(len(FPvariants)):
-				pos = FPvariants[i][0][0]
+				pos = FPvariants[i][0]
 				regionsToCheck.append((max([pos-EV_BPRANGE-1,0]),min([pos+EV_BPRANGE,len(myDat)-1])))
 
 			for n in regionsToCheck:
@@ -575,7 +515,7 @@ def main():
 
 				fpWithin = []
 				for i in xrange(len(FPvariants)):
-					m  = FPvariants[i][0]
+					m  = FPvariants[i]
 					if (m[0] > n[0] and m[0] < n[1]):
 						fpWithin.append((m,i))
 				fpWithin = sorted(fpWithin)
@@ -623,7 +563,7 @@ def main():
 		#	Tally up errors and whatnot
 		#
 		ztV += totalVariants
-		ztW += line_workflow
+		ztW += workflowUnique
 		znP += nPerfect
 		zfP += len(FPvariants)
 		znF += len(notFound)
@@ -759,17 +699,8 @@ def main():
 		print "\nWarning! Running with '--fast' means that identical variants denoted differently between the two vcfs will not be detected! The values above may be lower than the true accuracy."
 	print '\n**********************************\n'
 
-	#if MAPTRACK != None:
-	#	print 'mappability:'
-	#	print mappability_vs_FN
-	#
-	#print 'coverage:'
-	#for k in sorted(coverage_vs_FN.keys()):
-	#	print k,':',coverage_vs_FN[k]
-	#
-	#print 'allele balance:'
-	#for k in sorted(alleleBal_vs_FN.keys()):
-	#	print k,':',alleleBal_vs_FN[k]
+
+
 
 
 if __name__ == '__main__':
