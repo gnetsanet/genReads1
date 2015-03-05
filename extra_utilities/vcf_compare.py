@@ -374,11 +374,13 @@ def main():
 	#
 	vcfo2 = None
 	vcfo3 = None
+	global vcfo2_firstTime
+	global vcfo3_firstTime
+	vcfo2_firstTime = False
+	vcfo3_firstTime = False
 	if VCF_OUT:
 		vcfo2 = open(OUT_PREFIX+'_FN.vcf','w')
 		vcfo3 = open(OUT_PREFIX+'_FP.vcf','w')
-		global vcfo2_firstTime
-		global vcfo3_firstTime
 		vcfo2_firstTime = True
 		vcfo3_firstTime = True
 
