@@ -288,7 +288,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique)
 
 
-def condenseAlts(listIn,altsList,FNorFP):
+def condenseAlts(listIn,altsList):
 	to_condense   = {}
 	ext_info_dict = {}
 	for i in xrange(len(listIn)):
