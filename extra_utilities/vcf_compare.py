@@ -241,6 +241,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 					targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
 					if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 						
+						print colDict
 						pl_out = parseLine(splt)
 						if pl_out == None:
 							continue
