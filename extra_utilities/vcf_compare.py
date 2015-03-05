@@ -152,7 +152,7 @@ VCF_HEADER = '##fileformat=VCFv4.1\n##reference='+REFERENCE+'##INFO=<ID=DP,Numbe
 
 DP_TOKENS = ['DP','DPU','DPI']	# in the order that we'll look for them
 
-def parseLine(splt):
+def parseLine(splt,colDict):
 
 	#	check if we want to proceed..
 	ra = splt[colDict['REF']]
@@ -241,8 +241,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 					targLen = targRegionsFl[targInd]-targRegionsFl[targInd-1]
 					if (BEDFILE != None and targLen >= MINREGIONLEN) or BEDFILE == None:
 						
-						print colDict
-						pl_out = parseLine(splt)
+						pl_out = parseLine(splt,colDict)
 						if pl_out == None:
 							continue
 						(cov, qual, aa, af) = pl_out
@@ -445,7 +444,6 @@ def main():
 		sys.stdout.flush()
 		tt = time.time()
 
-		global colDict
 		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique)        = parseVCF(GOLDEN_VCF, refName, targRegionsFl, vcfo2, vcfo2_firstTime)
 		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique) = parseVCF(WORKFLOW_VCF, refName, targRegionsFl, vcfo3, vcfo3_firstTime)
 
