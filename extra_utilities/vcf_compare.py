@@ -229,6 +229,8 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	colSamp       = []
 	for line in open(VCF_FILENAME,'r'):
 		if line[0] != '#':
+			if ',' in line:
+				continue
 			if len(colDict) == 0:
 				print '\n\nError: VCF has no header?\n'+VCF_FILENAME+'\n\n'
 				exit(1)
