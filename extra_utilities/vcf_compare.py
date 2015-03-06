@@ -227,12 +227,14 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	var_filtered  = 0	# number of variants excluded due to filters (e.g. hom-refs, qual)
 	colDict       = {}
 	colSamp       = []
+	refDict = {}
 	for line in open(VCF_FILENAME,'r'):
 		if line[0] != '#':
 			if len(colDict) == 0:
 				print '\n\nError: VCF has no header?\n'+VCF_FILENAME+'\n\n'
 				exit(1)
 			splt = line.split('\t')
+			refDict[splt[0]] = 1
 			if splt[0] == refName:
 
 				var  = (int(splt[1]),splt[3],splt[4])
@@ -286,6 +288,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 				if VCF_OUT and outBool:
 					outBool = False
 					outFile.write(line)
+	print refDict.keys()
 
 	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique, var_filtered, hash_coll)
 
