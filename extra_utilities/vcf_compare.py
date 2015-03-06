@@ -215,16 +215,18 @@ def parseLine(splt,colDict,colSamp):
 
 
 def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
-	v_Hashed   = {}
-	v_Alts     = {}
-	v_Cov      = {}
-	v_AF       = {}
-	v_Qual     = {}
-	v_TargLen  = {}
-	nBelowMinRLen   = 0
-	line_unique     = 0
-	colDict    = {}
-	colSamp    = []
+	v_Hashed      = {}
+	v_Alts        = {}
+	v_Cov         = {}
+	v_AF          = {}
+	v_Qual        = {}
+	v_TargLen     = {}
+	nBelowMinRLen = 0
+	line_unique   = 0	# number of lines in vcf file containing unique variant
+	hash_coll     = 0	# number of times we saw a hash collision ("per line" so non-unique alt alleles don't get counted multiple times)
+	var_filtered  = 0	# number of variants excluded due to filters (e.g. hom-refs, qual)
+	colDict       = {}
+	colSamp       = []
 	for line in open(VCF_FILENAME,'r'):
 		if line[0] != '#':
 			if len(colDict) == 0:
@@ -242,6 +244,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 						
 						pl_out = parseLine(splt,colDict,colSamp)
 						if pl_out == None:
+							var_filtered += 1
 							continue
 						(cov, qual, aa, af) = pl_out
 
@@ -255,9 +258,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 									areWeUnique = True
 									v_Hashed[allVars[i]] = 1
 									v_Alts[allVars[i]]  = allVars
-							else:
-								if var in v_Hashed:
-									continue
+							elif var not in v_hashed:
 								areWeUnique = True
 								v_Hashed[var] = 1
 
@@ -268,8 +269,10 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 								v_Qual[var]    = qual
 								v_TargLen[var] = targLen
 								line_unique += 1
+							else:
+								hash_coll += 1
 						else:
-							continue
+							hash_coll += 1
 
 					else:
 						nBelowMinRLen += 1
@@ -284,7 +287,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 					outBool = False
 					outFile.write(line)
 
-	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique)
+	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique, var_filtered, hash_coll)
 
 
 def condenseAlts(listIn,altsList):
@@ -329,12 +332,16 @@ def main():
 	#print '{0:.3f} (sec)'.format(time.time()-tt)
 	ref_inds = [('chrM', 6, 16909), ('chr1', 16915, 254252549), ('chr2', 254252555, 502315916), ('chr3', 502315922, 704298801), ('chr4', 704298807, 899276169), ('chr5', 899276175, 1083809741), ('chr6', 1083809747, 1258347116), ('chr7', 1258347122, 1420668559), ('chr8', 1420668565, 1569959868), ('chr9', 1569959874, 1713997574), ('chr10', 1713997581, 1852243023), ('chr11', 1852243030, 1989949677), ('chr12', 1989949684, 2126478617), ('chr13', 2126478624, 2243951900), ('chr14', 2243951907, 2353448438), ('chr15', 2353448445, 2458030465), ('chr16', 2458030472, 2550192321), ('chr17', 2550192328, 2633011443), ('chr18', 2633011450, 2712650243), ('chr19', 2712650250, 2772961813), ('chr20', 2772961820, 2837247851), ('chr21', 2837247858, 2886340351), ('chr22', 2886340358, 2938671016), ('chrX', 2938671022, 3097046994), ('chrY', 3097047000, 3157608038)]
 
-	ztV = 0
-	ztW = 0
-	znP = 0
-	zfP = 0
-	znF = 0
-	znE = 0
+	ztV = 0	# total golden variants
+	ztW = 0	# total workflow variants
+	znP = 0	# total perfect matches
+	zfP = 0	# total false positives
+	znF = 0	# total false negatives
+	znE = 0	# total equivalent variants detected
+	zgF = 0	# total golden variants that were filtered and excluded
+	zgR = 0	# total golden variants that were excluded for being redundant
+	zwF = 0	# total workflow variants that were filtered and excluded
+	zwR = 0	# total workflow variants that were excluded for being redundant
 	if BEDFILE != None:
 		zbM = 0
 
@@ -443,11 +450,12 @@ def main():
 		sys.stdout.flush()
 		tt = time.time()
 
-		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique)        = parseVCF(GOLDEN_VCF, refName, targRegionsFl, vcfo2, vcfo2_firstTime)
-		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique) = parseVCF(WORKFLOW_VCF, refName, targRegionsFl, vcfo3, vcfo3_firstTime)
-
-		print '\nRAWRG:',len(correctHashed)
-		print 'RAWRW:',len(workflowHashed)
+		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique, gFiltered, gRedundant)        = parseVCF(GOLDEN_VCF, refName, targRegionsFl, vcfo2, vcfo2_firstTime)
+		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique, wFiltered, wRedundant) = parseVCF(WORKFLOW_VCF, refName, targRegionsFl, vcfo3, vcfo3_firstTime)
+		zgF += gFiltered
+		zgR += gRedundant
+		zwF += wFiltered
+		zwR += wRedundant
 
 		#
 		#	Deduce which variants are FP / FN
@@ -491,7 +499,7 @@ def main():
 		FPvariants = condenseAlts(FPvariants,workflowAlts)
 
 		#
-		#
+		#	tally up some values, if there are no golden variants lets save some CPU cycles and move to the next ref
 		#
 		totalGoldenVariants   = nPerfect + len(notFound)
 		totalWorkflowVariants = nPerfect + len(FPvariants)
