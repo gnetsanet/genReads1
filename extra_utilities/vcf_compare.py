@@ -688,15 +688,15 @@ def main():
 		print ouf
 		mpl.savefig(ouf)
 
-
 	#
 	#	spit out results to console
 	#
 	print '\n**********************************\n'
 	if BEDFILE != None:
 		print 'ONLY CONSIDERING VARIANTS FOUND WITHIN TARGETED REGIONS\n\n'
-	print 'Total Golden Variants:  ',ztV
-	print 'Total Workflow Variants:',ztW,'\n'
+	print 'Total Golden Variants:  ',ztV,'\t[',zgF,'filtered,',zgR,'redundant ]'
+	print 'Total Workflow Variants:',ztW,'\t[',zwF,'filtered,',zwR,'redundant ]'
+	print ''
 	if ztV > 0 and ztW > 0:
 		print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
 		print 'FN variants:   ',znF,'({0:.2f}%)'.format(100.*float(znF)/ztV)
