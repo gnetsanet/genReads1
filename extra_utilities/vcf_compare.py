@@ -258,7 +258,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 									areWeUnique = True
 									v_Hashed[allVars[i]] = 1
 									v_Alts[allVars[i]]  = allVars
-							elif var not in v_hashed:
+							elif var not in v_Hashed:
 								areWeUnique = True
 								v_Hashed[var] = 1
 
