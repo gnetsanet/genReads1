@@ -519,7 +519,7 @@ def main():
 		#                    = 3: should be discluded because an alt was found
 		foundInd = {}
 		for n in correctHashed.keys():
-			if correctHashed > 1:
+			if correctHashed[n] > 1:
 				foundInd[n[0]] = True
 		nPerfect = len(foundInd)
 		notFound   = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
