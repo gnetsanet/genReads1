@@ -525,6 +525,10 @@ def main():
 		notFound   = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 		FPvariants = [n for n in sorted(workflowHashed.keys()) if workflowHashed[n] == 1]
 
+		for var in notFound:
+			if var in correctAlts:
+				print var, correctAlts[var]
+
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
