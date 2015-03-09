@@ -470,31 +470,49 @@ def main():
 		#
 		#	Deduce which variants are FP / FN
 		#
-		nPerfect = 0
-		FPvariants = []
-		alts_to_ignore = []
+		###nPerfect = 0
+		###FPvariants = []
+		###alts_to_ignore = []
+		###for var in sorted(workflowHashed.keys()):
+		###	if var in correctHashed:
+		###		nPerfect += 1
+		###		if correctHashed[var] != 3:
+		###			correctHashed[var] = 2
+		###		if var in correctAlts:				# ignore golden alts if one of them was found
+		###			alreadySeen = True
+		###			for v2 in correctAlts[var]:
+		###				if correctHashed[v2] != 3:
+		###					correctHashed[v2] = 3
+		###					alreadySeen = False
+		###			if alreadySeen:
+		###				nPerfect -= 1
+		###		if var in workflowAlts:
+		###			alts_to_ignore.extend(workflowAlts[var])
+		###	else:
+		###		FPvariants.append(var)
+		####	remove any trace of workflow variants who were not found, but whose alternate was
+		###for i in xrange(len(FPvariants)-1,-1,-1):
+		###	if FPvariants[i] in alts_to_ignore:
+		###		del FPvariants[i]
+
+		#
+		#	Deduce which variants are FP / FN
+		#
 		for var in sorted(workflowHashed.keys()):
 			if var in correctHashed:
-				nPerfect += 1
-				if correctHashed[var] != 3:
-					correctHashed[var] = 2
-				if var in correctAlts:				# ignore golden alts if one of them was found
-					alreadySeen = True
-					for v2 in correctAlts[var]:
-						if correctHashed[v2] != 3:
-							correctHashed[v2] = 3
-							alreadySeen = False
-					if alreadySeen:
-						nPerfect -= 1
-				if var in workflowAlts:
-					alts_to_ignore.extend(workflowAlts[var])
-			else:
-				FPvariants.append(var)
 
-		#	remove any trace of workflow variants who were not found, but whose alternate was
-		for i in xrange(len(FPvariants)-1,-1,-1):
-			if FPvariants[i] in alts_to_ignore:
-				del FPvariants[i]
+				if correctHashed[var] == 1:
+					correctHashed[var] = 2
+				if workflowHashed[var] == 1:
+					workflowHashed[var] = 2
+
+				if var in correctAlts:
+					for v2 in correctAlts[var]:
+						correctHashed[v2] = 3
+				if var in workflowAlts:
+					for v2 in workflowAlts[var]:
+						workflowHashed[v2] = 3
+
 		
 		# correctHashed[var] = 1: were not found
 		#                    = 2: should be discluded because we were found
@@ -504,7 +522,8 @@ def main():
 			if correctHashed > 1:
 				foundInd[n[0]] = True
 		nPerfect = len(foundInd)
-		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
+		notFound   = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
+		FPvariants = [n for n in sorted(workflowHashed.keys()) if workflowHashed[n] == 1]
 
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
