@@ -252,11 +252,11 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 
 						if var not in v_Hashed:
 
-							vpos = (var[0],var[1])
+							vpos = var[0]
 							if vpos in v_posHash:
 								if len(aa) == 0:
 									aa = [var[2]]
-								aa.extend([n[2] for n in v_Hashed.keys() if n[0] == vpos[0]])
+								aa.extend([n[2] for n in v_Hashed.keys() if n[0] == vpos])
 								var_merged += 1
 							v_posHash[vpos] = 1
 							
@@ -264,9 +264,10 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 								allVars = [(var[0],var[1],n) for n in aa]
 								for i in xrange(len(allVars)):
 									v_Hashed[allVars[i]] = 1
-									if allVars[i] not in v_Alts:
-										v_Alts[allVars[i]] = []
-									v_Alts[allVars[i]].extend(allVars)
+									#if allVars[i] not in v_Alts:
+									#	v_Alts[allVars[i]] = []
+									#v_Alts[allVars[i]].extend(allVars)
+									v_Alts[allVars[i]] = allVars
 							else:
 								v_Hashed[var] = 1
 
@@ -525,10 +526,6 @@ def main():
 		notFound   = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 		FPvariants = [n for n in sorted(workflowHashed.keys()) if workflowHashed[n] == 1]
 
-		for var in notFound:
-			if var in correctAlts:
-				print var, correctAlts[var]
-
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
@@ -539,6 +536,7 @@ def main():
 		#
 		#	tally up some values, if there are no golden variants lets save some CPU cycles and move to the next ref
 		#
+		print '\nrawr:',nPerfect,len(notFound),'\n'
 		totalGoldenVariants   = nPerfect + len(notFound)
 		totalWorkflowVariants = nPerfect + len(FPvariants)
 		if totalGoldenVariants == 0:
