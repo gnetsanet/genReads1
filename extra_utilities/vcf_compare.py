@@ -256,7 +256,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 							if vpos in v_posHash:
 								if len(aa) == 0:
 									aa = [var[2]]
-								aa.extend([n[2] for n in v_Hashed.keys() if (n[0],n[1]) == vpos])
+								aa.extend([n[2] for n in v_Hashed.keys() if n[0] == vpos[0]])
 								var_merged += 1
 							v_posHash[vpos] = 1
 							
@@ -499,6 +499,11 @@ def main():
 		# correctHashed[var] = 1: were not found
 		#                    = 2: should be discluded because we were found
 		#                    = 3: should be discluded because an alt was found
+		foundInd = {}
+		for n in correctHashed.keys():
+			if correctHashed > 1:
+				foundInd[n[0]] = True
+		nPerfect = len(foundInd)
 		notFound = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 
 		#
@@ -657,7 +662,7 @@ def main():
 							vcfo3.write(line)
 
 		print '{0:.3f} (sec)'.format(time.time()-tt)
-		
+
 		if refName == 'chr1':
 			break
 
