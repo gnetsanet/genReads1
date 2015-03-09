@@ -216,6 +216,7 @@ def parseLine(splt,colDict,colSamp):
 
 def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	v_Hashed      = {}
+	v_posHash     = {}
 	v_Alts        = {}
 	v_Cov         = {}
 	v_AF          = {}
@@ -225,6 +226,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	line_unique   = 0	# number of lines in vcf file containing unique variant
 	hash_coll     = 0	# number of times we saw a hash collision ("per line" so non-unique alt alleles don't get counted multiple times)
 	var_filtered  = 0	# number of variants excluded due to filters (e.g. hom-refs, qual)
+	var_merged    = 0	# number of variants we merged into another due to having the same position specified
 	colDict       = {}
 	colSamp       = []
 	for line in open(VCF_FILENAME,'r'):
@@ -233,8 +235,6 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 				print '\n\nError: VCF has no header?\n'+VCF_FILENAME+'\n\n'
 				exit(1)
 			splt = line.split('\t')
-			if ',' in splt[4]:
-				continue
 			if splt[0] == refName:
 
 				var  = (int(splt[1]),splt[3],splt[4])
@@ -251,28 +251,32 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 						(cov, qual, aa, af) = pl_out
 
 						if var not in v_Hashed:
-							areWeUnique = False
+
+							vpos = (var[0],var[1])
+							if vpos in v_posHash:
+								if len(aa) == 0:
+									aa = [var[2]]
+								aa.extend([n[2] for n in v_Hashed.keys() if (n[0],n[1]) == vpos])
+								var_merged += 1
+							v_posHash[vpos] = 1
+							
 							if len(aa):
 								allVars = [(var[0],var[1],n) for n in aa]
 								for i in xrange(len(allVars)):
-									if allVars[i] in v_Hashed:
-										continue
-									areWeUnique = True
 									v_Hashed[allVars[i]] = 1
-									v_Alts[allVars[i]]  = allVars
-							elif var not in v_Hashed:
-								areWeUnique = True
+									if allVars[i] not in v_Alts:
+										v_Alts[allVars[i]] = []
+									v_Alts[allVars[i]].extend(allVars)
+							else:
 								v_Hashed[var] = 1
 
-							if areWeUnique:
-								if cov != None:
-									v_Cov[var] = cov
-								v_AF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
-								v_Qual[var]    = qual
-								v_TargLen[var] = targLen
-								line_unique += 1
-							else:
-								hash_coll += 1
+							if cov != None:
+								v_Cov[var] = cov
+							v_AF[var]      = af[0]		# only use first AF, even if multiple. fix this later?
+							v_Qual[var]    = qual
+							v_TargLen[var] = targLen
+							line_unique += 1
+
 						else:
 							hash_coll += 1
 
@@ -289,7 +293,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 					outBool = False
 					outFile.write(line)
 
-	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique, var_filtered, hash_coll)
+	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique, var_filtered, var_merged, hash_coll)
 
 
 def condenseAlts(listIn,altsList):
@@ -316,23 +320,23 @@ def main():
 	nLines = 0
 	prevR = None
 	prevP = None
-	#ref_inds = []
-	#sys.stdout.write('\nindexing reference fasta... ')
-	#sys.stdout.flush()
-	#tt = time.time()
-	#while 1:
-	#	nLines += 1
-	#	data = f.readline()
-	#	if not data:
-	#		ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
-	#		break
-	#	if data[0] == '>':
-	#		if prevP != None:
-	#			ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
-	#		prevP = f.tell()
-	#		prevR = data[1:-1]
-	#print '{0:.3f} (sec)'.format(time.time()-tt)
-	ref_inds = [('chrM', 6, 16909), ('chr1', 16915, 254252549), ('chr2', 254252555, 502315916), ('chr3', 502315922, 704298801), ('chr4', 704298807, 899276169), ('chr5', 899276175, 1083809741), ('chr6', 1083809747, 1258347116), ('chr7', 1258347122, 1420668559), ('chr8', 1420668565, 1569959868), ('chr9', 1569959874, 1713997574), ('chr10', 1713997581, 1852243023), ('chr11', 1852243030, 1989949677), ('chr12', 1989949684, 2126478617), ('chr13', 2126478624, 2243951900), ('chr14', 2243951907, 2353448438), ('chr15', 2353448445, 2458030465), ('chr16', 2458030472, 2550192321), ('chr17', 2550192328, 2633011443), ('chr18', 2633011450, 2712650243), ('chr19', 2712650250, 2772961813), ('chr20', 2772961820, 2837247851), ('chr21', 2837247858, 2886340351), ('chr22', 2886340358, 2938671016), ('chrX', 2938671022, 3097046994), ('chrY', 3097047000, 3157608038)]
+	ref_inds = []
+	sys.stdout.write('\nindexing reference fasta... ')
+	sys.stdout.flush()
+	tt = time.time()
+	while 1:
+		nLines += 1
+		data = f.readline()
+		if not data:
+			ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
+			break
+		if data[0] == '>':
+			if prevP != None:
+				ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
+			prevP = f.tell()
+			prevR = data[1:-1]
+	print '{0:.3f} (sec)'.format(time.time()-tt)
+	#ref_inds = [('chrM', 6, 16909), ('chr1', 16915, 254252549), ('chr2', 254252555, 502315916), ('chr3', 502315922, 704298801), ('chr4', 704298807, 899276169), ('chr5', 899276175, 1083809741), ('chr6', 1083809747, 1258347116), ('chr7', 1258347122, 1420668559), ('chr8', 1420668565, 1569959868), ('chr9', 1569959874, 1713997574), ('chr10', 1713997581, 1852243023), ('chr11', 1852243030, 1989949677), ('chr12', 1989949684, 2126478617), ('chr13', 2126478624, 2243951900), ('chr14', 2243951907, 2353448438), ('chr15', 2353448445, 2458030465), ('chr16', 2458030472, 2550192321), ('chr17', 2550192328, 2633011443), ('chr18', 2633011450, 2712650243), ('chr19', 2712650250, 2772961813), ('chr20', 2772961820, 2837247851), ('chr21', 2837247858, 2886340351), ('chr22', 2886340358, 2938671016), ('chrX', 2938671022, 3097046994), ('chrY', 3097047000, 3157608038)]
 
 	ztV = 0	# total golden variants
 	ztW = 0	# total workflow variants
@@ -342,8 +346,10 @@ def main():
 	znE = 0	# total equivalent variants detected
 	zgF = 0	# total golden variants that were filtered and excluded
 	zgR = 0	# total golden variants that were excluded for being redundant
+	zgM = 0	# total golden variants that were merged into a single position
 	zwF = 0	# total workflow variants that were filtered and excluded
 	zwR = 0	# total workflow variants that were excluded for being redundant
+	zwM = 0	# total workflow variants that were merged into a single position
 	if BEDFILE != None:
 		zbM = 0
 
@@ -452,12 +458,14 @@ def main():
 		sys.stdout.flush()
 		tt = time.time()
 
-		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique, gFiltered, gRedundant)        = parseVCF(GOLDEN_VCF, refName, targRegionsFl, vcfo2, vcfo2_firstTime)
-		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique, wFiltered, wRedundant) = parseVCF(WORKFLOW_VCF, refName, targRegionsFl, vcfo3, vcfo3_firstTime)
+		(correctHashed, correctAlts, correctCov, correctAF, correctQual, correctTargLen, correctBelowMinRLen, correctUnique, gFiltered, gMerged, gRedundant)        = parseVCF(GOLDEN_VCF, refName, targRegionsFl, vcfo2, vcfo2_firstTime)
+		(workflowHashed, workflowAlts, workflowCov, workflowAF, workflowQual, workflowTarLen, workflowBelowMinRLen, workflowUnique, wFiltered, wMerged, wRedundant) = parseVCF(WORKFLOW_VCF, refName, targRegionsFl, vcfo3, vcfo3_firstTime)
 		zgF += gFiltered
 		zgR += gRedundant
+		zgM += gMerged
 		zwF += wFiltered
 		zwR += wRedundant
+		zwM += wMerged
 
 		#
 		#	Deduce which variants are FP / FN
@@ -696,8 +704,8 @@ def main():
 	print '\n**********************************\n'
 	if BEDFILE != None:
 		print 'ONLY CONSIDERING VARIANTS FOUND WITHIN TARGETED REGIONS\n\n'
-	print 'Total Golden Variants:  ',ztV,'\t[',zgF,'filtered,',zgR,'redundant ]'
-	print 'Total Workflow Variants:',ztW,'\t[',zwF,'filtered,',zwR,'redundant ]'
+	print 'Total Golden Variants:  ',ztV,'\t[',zgF,'filtered,',zgM,'merged,',zgR,'redundant ]'
+	print 'Total Workflow Variants:',ztW,'\t[',zwF,'filtered,',zwM,'merged,',zwR,'redundant ]'
 	print ''
 	if ztV > 0 and ztW > 0:
 		print 'Perfect Matches:',znP,'({0:.2f}%)'.format(100.*float(znP)/ztV)
