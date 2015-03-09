@@ -320,23 +320,23 @@ def main():
 	nLines = 0
 	prevR = None
 	prevP = None
-	ref_inds = []
-	sys.stdout.write('\nindexing reference fasta... ')
-	sys.stdout.flush()
-	tt = time.time()
-	while 1:
-		nLines += 1
-		data = f.readline()
-		if not data:
-			ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
-			break
-		if data[0] == '>':
-			if prevP != None:
-				ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
-			prevP = f.tell()
-			prevR = data[1:-1]
-	print '{0:.3f} (sec)'.format(time.time()-tt)
-	#ref_inds = [('chrM', 6, 16909), ('chr1', 16915, 254252549), ('chr2', 254252555, 502315916), ('chr3', 502315922, 704298801), ('chr4', 704298807, 899276169), ('chr5', 899276175, 1083809741), ('chr6', 1083809747, 1258347116), ('chr7', 1258347122, 1420668559), ('chr8', 1420668565, 1569959868), ('chr9', 1569959874, 1713997574), ('chr10', 1713997581, 1852243023), ('chr11', 1852243030, 1989949677), ('chr12', 1989949684, 2126478617), ('chr13', 2126478624, 2243951900), ('chr14', 2243951907, 2353448438), ('chr15', 2353448445, 2458030465), ('chr16', 2458030472, 2550192321), ('chr17', 2550192328, 2633011443), ('chr18', 2633011450, 2712650243), ('chr19', 2712650250, 2772961813), ('chr20', 2772961820, 2837247851), ('chr21', 2837247858, 2886340351), ('chr22', 2886340358, 2938671016), ('chrX', 2938671022, 3097046994), ('chrY', 3097047000, 3157608038)]
+	#ref_inds = []
+	#sys.stdout.write('\nindexing reference fasta... ')
+	#sys.stdout.flush()
+	#tt = time.time()
+	#while 1:
+	#	nLines += 1
+	#	data = f.readline()
+	#	if not data:
+	#		ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
+	#		break
+	#	if data[0] == '>':
+	#		if prevP != None:
+	#			ref_inds.append( (prevR, prevP, f.tell()-len(data)) )
+	#		prevP = f.tell()
+	#		prevR = data[1:-1]
+	#print '{0:.3f} (sec)'.format(time.time()-tt)
+	ref_inds = [('chrM', 6, 16909), ('chr1', 16915, 254252549), ('chr2', 254252555, 502315916), ('chr3', 502315922, 704298801), ('chr4', 704298807, 899276169), ('chr5', 899276175, 1083809741), ('chr6', 1083809747, 1258347116), ('chr7', 1258347122, 1420668559), ('chr8', 1420668565, 1569959868), ('chr9', 1569959874, 1713997574), ('chr10', 1713997581, 1852243023), ('chr11', 1852243030, 1989949677), ('chr12', 1989949684, 2126478617), ('chr13', 2126478624, 2243951900), ('chr14', 2243951907, 2353448438), ('chr15', 2353448445, 2458030465), ('chr16', 2458030472, 2550192321), ('chr17', 2550192328, 2633011443), ('chr18', 2633011450, 2712650243), ('chr19', 2712650250, 2772961813), ('chr20', 2772961820, 2837247851), ('chr21', 2837247858, 2886340351), ('chr22', 2886340358, 2938671016), ('chrX', 2938671022, 3097046994), ('chrY', 3097047000, 3157608038)]
 
 	ztV = 0	# total golden variants
 	ztW = 0	# total workflow variants
@@ -657,6 +657,9 @@ def main():
 							vcfo3.write(line)
 
 		print '{0:.3f} (sec)'.format(time.time()-tt)
+		
+		if refName == 'chr1':
+			break
 
 	#
 	#	close vcf output
