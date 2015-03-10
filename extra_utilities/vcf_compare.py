@@ -553,6 +553,16 @@ def main():
 			var = (v[0][0],v[0][1],','.join([n[2] for n in v]))
 			notFound.append(var)
 
+		indCount = {}
+		for n in notFound:
+			c = n[0]
+			if c not in indCount:
+				indCount[c] = 0
+			indCount[c] += 1
+		for k in sorted(indCount.keys()):
+			if indCount[k] > 1:
+				print k, indCount[k]
+
 
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
