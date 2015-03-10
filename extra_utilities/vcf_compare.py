@@ -496,6 +496,14 @@ def main():
 		###	if FPvariants[i] in alts_to_ignore:
 		###		del FPvariants[i]
 
+		for k in correctAlts.keys():
+			myKeys = correctAlts[k]
+			myLen  = len(myKeys)
+			for k2 in myKeys:
+				if len(correctAlts[k2]) != myLen:
+					print 'NO GOOD.'
+					exit(1)
+
 		#
 		#	Deduce which variants are FP / FN
 		#
