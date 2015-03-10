@@ -57,6 +57,7 @@ DEFAULT_MBD = 95							# default minimum bed-file region size to consider for ta
 DEFAULT_BCV = 0								# default coverage in non-targeted regions
 DEFAULT_QSM = 'models/qModel_AlvaroPhix.p'	# default quality-score model
 DEFAULT_SSM = 'models/SSE_model1_pIRS.p'	# default sequencing-substituion-error model
+DEFAULT_MUM = 'models/mutModel_default.p'	# default mutation model
 DEFAULT_SIE = 0.01							# default sequencing-indel-error frequency
 DEFAULT_SII = 0.4							# default frequency of insertion errors
 
@@ -74,6 +75,7 @@ PARSER.add_option('-F',    help='Fragment length std [%default]',               
 PARSER.add_option('-i',    help='P(SIE error | sequencing error occurs) [%default]',  dest='SIER',    default=DEFAULT_SIE, action='store',      metavar='<float>')
 PARSER.add_option('-I',    help='P(insertion error | SIE error occurs) [%default]',   dest='SIEI',    default=DEFAULT_SII, action='store',      metavar='<float>')
 PARSER.add_option('-l',    help='Read length [%default]',                             dest='RLEN',    default=DEFAULT_RLN, action='store',      metavar='<int>')
+PARSER.add_option('-m',    help='Mutation model [%default]',                          dest='MUM',     default=DEFAULT_MUM, action='store',      metavar='<model.p>')
 PARSER.add_option('-o',    help='Output filename prefix',                             dest='OUT',                          action='store',      metavar='<out.prefix>')
 PARSER.add_option('-q',    help='Quality score model [%default]',                     dest='QSM',     default=DEFAULT_QSM, action='store',      metavar='<model.p>')
 PARSER.add_option('-r',    help='Reference fasta',                                    dest='REF',                          action='store',      metavar='<ref.fa>')
@@ -137,10 +139,17 @@ FRAGMENT_STD   = int(OPTS.FSTD)
 COV_WINDOW     = int(OPTS.WIN)
 MIN_PROBE_LEN  = int(OPTS.MBD)
 
+# if a sequencing error occurs, what are the odds it's an indel?
+SIE_RATE = float(OPTS.SIER)
+# if a sequencing indel error occurs, what are the odds it's an insertion as opposed to a deletion?
+SIE_INS_FREQ = float(OPTS.SIEI)
+# if a sequencing insertion error occurs, what's the probability of it being an A, C, G, T...
+SIE_NUCL = [0.25, 0.25, 0.25, 0.25]
+
 AVG_SER        = float(OPTS.SER)
 if AVG_SER != 0.0:
 	SEQUENCING_SNPS    = 1
-	if SIE_FREQ != 0.0:
+	if SIE_RATE != 0.0:
 		SEQUENCING_INDELS = 1
 	else:
 		SEQUENCING_INDELS = 0
@@ -193,6 +202,11 @@ if MULTI_JOB:
 else:
 	OUTFILE_NAME = OPTS.OUT
 
+if OPTS.MUM == DEFAULT_MUM:
+	MUT_MODEL = SIM_PATH+DEFAULT_MUM
+else:
+	MUT_MODEL = OPTS.MUM
+
 
 """//////////////////////////////////////////////////
 ////////////    OTHER MISC PARAMETERS    ////////////
@@ -212,55 +226,26 @@ else:
 DUMMY_QSCORE = 30
 
 
-"""///////////////////////////////////////////
-////////////    MUTATION MODEL    ////////////
-///////////////////////////////////////////"""
+"""////////////////////////////////////////////////////////
+////////////    LOAD SEQUENCING ERROR MODEL    ////////////
+////////////////////////////////////////////////////////"""
 
-MUT_MODEL    = 'DEFAULT'
-
-# probability of SNP occuring at any nucleotide
-SNP_FREQ   = .003
-# probability of indels of length 1,2,3,4,... occuring at any nucleotide
-INDEL_MUT  = [.00015,.00002,.00001,.000005,.000002]
-MAX_INDEL  = len(INDEL_MUT)
-# probability of any indel occuring
-INDEL_FREQ = sum(INDEL_MUT)
-# if an indel occurs, what are the odds it's an insertion as opposed to a deletion?
-INS_FREQ   = 0.25
-# how do the nucleotides mutate into eachother if a SNP occurs?
-SNP_MUT    = [[0.,   0.15,  0.70,  0.15],
-		      [0.15, 0.,    0.15,  0.70],
-		      [0.70, 0.15,  0.,    0.15],
-		      [0.15, 0.70,  0.15,  0.  ]]
-
-
-"""///////////////////////////////////////////////////
-////////////    SEQUENCING ERROR MODEL    ////////////
-///////////////////////////////////////////////////"""
-
-# how are the nucleotides misrepresented if a sub sequencing error occurs?
+## how are the nucleotides misrepresented if a sub sequencing error occurs?
 #SEQ_ERR    = [[0.,     0.4918, 0.3377, 0.1705 ],
 #			  [0.5238,     0., 0.2661, 0.2101 ],
 #			  [0.3754, 0.2355,     0., 0.3890 ],
 #			  [0.2505, 0.2552, 0.4942, 0.     ]]
-
-# probability of sequencing insertion errors (length 1,2,3..)
+#
+## probability of sequencing insertion errors (length 1,2,3..)
 #SEQ_INS    = [0., 0., 0.]
-
-# probability of sequencing deletion errors (length 1,2,3..)
+#
+## probability of sequencing deletion errors (length 1,2,3..)
 #SEQ_DEL    = [0., 0., 0.]
 
 if OPTS.SSM == DEFAULT_SSM:
 	SSE_MODEL = SIM_PATH+DEFAULT_SSM
 else:
 	SSE_MODEL = OPTS.SSM
-
-# if a sequencing error occurs, what are the odds it's an indel?
-SIE_RATE = float(OPTS.SIER)
-# if a sequencing indel error occurs, what are the odds it's an insertion as opposed to a deletion?
-SIE_INS_FREQ = float(OPTS.SIEI)
-# if a sequencing insertion error occurs, what's the probability of it being an A, C, G, T...
-SIE_NUCL = [0.25, 0.25, 0.25, 0.25]
 
 
 """////////////////////////////////////////////////
@@ -361,6 +346,36 @@ if BED_COVERAGE < 0.:
 if not os.path.isfile(SSE_MODEL):
 	print 'Error: Could not open SSE model.'
 	exit(1)
+
+if not os.path.isfile(MUT_MODEL):
+	print 'Error: Could not open mutation model.'
+	exit(1)
+
+
+"""////////////////////////////////////////////////
+////////////    LOAD MUTATION MODEL    ////////////
+////////////////////////////////////////////////"""
+
+## name of model
+#MUT_MNAME    = 'DEFAULT'
+## probability of SNP occuring at any nucleotide
+#SNP_FREQ   = .003
+## probability of indels of length 1,2,3,4,... occuring at any nucleotide
+#INDEL_MUT  = [.00015,.00002,.00001,.000005,.000002]
+## if an indel occurs, what are the odds it's an insertion as opposed to a deletion?
+#INS_FREQ   = 0.25
+## how do the nucleotides mutate into eachother if a SNP occurs?
+#SNP_MUT    = [[0.,   0.15,  0.70,  0.15],
+#		      [0.15, 0.,    0.15,  0.70],
+#		      [0.70, 0.15,  0.,    0.15],
+#		      [0.15, 0.70,  0.15,  0.  ]]
+
+[MUT_MNAME, SNP_FREQ, INDEL_MUT, INS_FREQ, SNP_MUT] = pickle.load(open(MUT_MODEL,'rb'))
+
+# max indel size
+MAX_INDEL  = len(INDEL_MUT)
+# probability of any indel occuring
+INDEL_FREQ = sum(INDEL_MUT)
 
 
 """////////////////////////////////////////////////
@@ -1548,9 +1563,11 @@ def main():
 
 					# take out indels if this read is heterozygous and has ref allele instead
 					affectedBp = [n for n in affectedBp if n not in skipTheseInds]
-					if len(seqErrObj.sie_errors):
-						print 'read #:',str(nReads+myJobOffset+bigReadNameOffset)+'/1'
-						print 'affectedBp:',affectedBp
+					
+					#if len(seqErrObj.sie_errors):
+					#	print 'read #:',str(nReads+myJobOffset+bigReadNameOffset)+'/1'
+					#	print 'affectedBp:',affectedBp
+
 					# adjust indel offsets of variants following hets that have ref instead
 					for i in xrange(len(affectedBp)):
 						tabi = tuple(affectedBp[i])
@@ -1935,7 +1952,7 @@ def main():
 			rfOut.write('QScore Model:\t'+QSCORE_MODEL+' : ['+str(Qscores[0])+','+str(Qscores[-1])+'] + '+str(qOffset)+'\n')
 		else:
 			rfOut.write('Qscore Model:\tNone (dummy value: '+str(DUMMY_QSCORE)+' + '+str(qOffset)+' )\n')
-		rfOut.write('Mutation Model:\t'+MUT_MODEL+'\n')
+		rfOut.write('Mutation Model:\t'+MUT_MNAME+'\n')
 		if INPUT_BED == None:
 			rfOut.write('WindowSize:\t\t'+str(COV_WINDOW)+'\n')
 		else:
