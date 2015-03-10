@@ -527,22 +527,39 @@ def main():
 		notFound   = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 		FPvariants = [n for n in sorted(workflowHashed.keys()) if workflowHashed[n] == 1]
 
+		#
+		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
+		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
+		#
 		indCount = {}
 		for n in notFound:
 			c = n[0]
 			if c not in indCount:
 				indCount[c] = 0
 			indCount[c] += 1
-		for k in sorted(indCount.keys()):
-			if indCount[k] >= 2:
-				print k, indCount[k]
+		nonUniqueDict = {n for n in sorted(indCount.keys()) if indCount[n] > 1:[]}
+		del indCount
+		del correctAlts
+		del workflowAlts
+		delList = []
+		for i in xrange(len(notFound)):
+			if n[0] in nonUniqueDict:
+				nonUniqueDict[n[0]].append(n)
+				delList.append(i)
+		delList = sorted(delList,reverse=True)
+		for di in delList:
+			del notFound[di]
+		for v in nonUniqueDict.values():
+			var = (v[0][0],v[0][1],','.join([n[2] for n in v]))
+			notFound.append(var)
+
 
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		notFound   = condenseAlts(notFound,correctAlts)
-		FPvariants = condenseAlts(FPvariants,workflowAlts)
+		###notFound   = condenseAlts(notFound,correctAlts)
+		###FPvariants = condenseAlts(FPvariants,workflowAlts)
 
 		indCount = {}
 		for n in notFound:
