@@ -500,7 +500,7 @@ def main():
 		#	Deduce which variants are FP / FN
 		#
 		for var in sorted(correctHashed.keys()):
-			if correctHashed[var] == 1 and var in workflowHashed:
+			if var in workflowHashed:
 
 				if correctHashed[var] == 1:
 					correctHashed[var] = 2
@@ -513,6 +513,8 @@ def main():
 				if var in workflowAlts:
 					for v2 in workflowAlts[var]:
 						workflowHashed[v2] = 3
+
+		print 'gnaaa',len(correctHashed),correctHashed.values().count(1)
 		
 		# correctHashed[var] = 1: were not found
 		#                    = 2: should be discluded because we were found
