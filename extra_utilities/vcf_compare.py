@@ -499,10 +499,13 @@ def main():
 		for k in correctAlts.keys():
 			myKeys = correctAlts[k]
 			myLen  = len(myKeys)
+			my0 = k[0]
 			for k2 in myKeys:
-				if len(correctAlts[k2]) != myLen:
-					print 'NO GOOD.'
-					exit(1)
+				for n in correctAlts[k2]:
+					if n[0] != my0:
+						print 'NO GOOD.',k,myKeys
+						exit(1)
+
 
 		#
 		#	Deduce which variants are FP / FN
