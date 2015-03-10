@@ -499,20 +499,31 @@ def main():
 		#
 		#	Deduce which variants are FP / FN
 		#
-		for var in sorted(correctHashed.keys()):
-			if var in workflowHashed:
+		###for var in sorted(correctHashed.keys()):
+		###	if var in workflowHashed:
+		###
+		###		if correctHashed[var] == 1:
+		###			correctHashed[var] = 2
+		###		if workflowHashed[var] == 1:
+		###			workflowHashed[var] = 2
+		###
+		###		if var in correctAlts:
+		###			for v2 in correctAlts[var]:
+		###				correctHashed[v2] = 3
+		###		if var in workflowAlts:
+		###			for v2 in workflowAlts[var]:
+		###				workflowHashed[v2] = 3
 
-				if correctHashed[var] == 1:
-					correctHashed[var] = 2
-				if workflowHashed[var] == 1:
-					workflowHashed[var] = 2
-
-				if var in correctAlts:
-					for v2 in correctAlts[var]:
-						correctHashed[v2] = 3
-				if var in workflowAlts:
-					for v2 in workflowAlts[var]:
-						workflowHashed[v2] = 3
+		solvedInds = {}
+		for var in correctHashed.keys():
+			if var in workflowHashed or var[0] in solvedInds:
+				correctHashed[var]  = 2
+				workflowHashed[var] = 2
+				solvedInds[var[0]] = True
+		for var in correctHashed.keys()+workflowHashed.keys():
+			if var[0] in solvedInds:
+				correctHashed[var]  = 2
+				workflowHashed[var] = 2
 
 		print 'gnaaa',len(correctHashed),correctHashed.values().count(1)
 		
@@ -531,38 +542,35 @@ def main():
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		indCount = {}
-		for n in notFound:
-			c = n[0]
-			if c not in indCount:
-				indCount[c] = 0
-			indCount[c] += 1
-		nonUniqueDict = {n:[] for n in sorted(indCount.keys()) if indCount[n] > 1}
-		#del indCount
-		#del correctAlts
-		#del workflowAlts
-		delList = []
-		for i in xrange(len(notFound)):
-			if notFound[i][0] in nonUniqueDict:
-				nonUniqueDict[notFound[i][0]].append(notFound[i])
-				delList.append(i)
-		delList = sorted(delList,reverse=True)
-		for di in delList:
-			del notFound[di]
-		for v in nonUniqueDict.values():
-			var = (v[0][0],v[0][1],','.join([n[2] for n in v]))
-			notFound.append(var)
-
-		indCount = {}
-		for n in notFound:
-			c = n[0]
-			if c not in indCount:
-				indCount[c] = 0
-			indCount[c] += 1
-		for k in sorted(indCount.keys()):
-			if indCount[k] > 1:
-				print k, indCount[k]
-
+		###indCount = {}
+		###for n in notFound:
+		###	c = n[0]
+		###	if c not in indCount:
+		###		indCount[c] = 0
+		###	indCount[c] += 1
+		###nonUniqueDict = {n:[] for n in sorted(indCount.keys()) if indCount[n] > 1}
+		###delList = []
+		###for i in xrange(len(notFound)):
+		###	if notFound[i][0] in nonUniqueDict:
+		###		nonUniqueDict[notFound[i][0]].append(notFound[i])
+		###		delList.append(i)
+		###delList = sorted(delList,reverse=True)
+		###for di in delList:
+		###	del notFound[di]
+		###for v in nonUniqueDict.values():
+		###	var = (v[0][0],v[0][1],','.join([n[2] for n in v]))
+		###	notFound.append(var)
+		###
+		###indCount = {}
+		###for n in notFound:
+		###	c = n[0]
+		###	if c not in indCount:
+		###		indCount[c] = 0
+		###	indCount[c] += 1
+		###for k in sorted(indCount.keys()):
+		###	if indCount[k] > 1:
+		###		print k, indCount[k]
+		###
 
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
