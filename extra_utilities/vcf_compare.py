@@ -496,17 +496,6 @@ def main():
 		###	if FPvariants[i] in alts_to_ignore:
 		###		del FPvariants[i]
 
-		for k in correctAlts.keys():
-			myKeys = correctAlts[k]
-			myLen  = len(myKeys)
-			my0 = k[0]
-			for k2 in myKeys:
-				for n in correctAlts[k2]:
-					if n[0] != my0:
-						print 'NO GOOD.',k,myKeys
-						exit(1)
-
-
 		#
 		#	Deduce which variants are FP / FN
 		#
@@ -538,12 +527,32 @@ def main():
 		notFound   = [n for n in sorted(correctHashed.keys()) if correctHashed[n] == 1]
 		FPvariants = [n for n in sorted(workflowHashed.keys()) if workflowHashed[n] == 1]
 
+		indCount = {}
+		for n in notFound:
+			c = n[0]
+			if c not in indCount:
+				indCount[c] = 0
+			indCount[c] += 1
+		for k in sorted(indCount.keys()):
+			if indCount[k] >= 2:
+				print k, indCount[k]
+
 		#
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
 		notFound   = condenseAlts(notFound,correctAlts)
 		FPvariants = condenseAlts(FPvariants,workflowAlts)
+
+		indCount = {}
+		for n in notFound:
+			c = n[0]
+			if c not in indCount:
+				indCount[c] = 0
+			indCount[c] += 1
+		for k in sorted(indCount.keys()):
+			if indCount[k] >= 2:
+				print k, indCount[k]
 
 		#
 		#	tally up some values, if there are no golden variants lets save some CPU cycles and move to the next ref
