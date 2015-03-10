@@ -538,9 +538,9 @@ def main():
 				indCount[c] = 0
 			indCount[c] += 1
 		nonUniqueDict = {n:[] for n in sorted(indCount.keys()) if indCount[n] > 1}
-		del indCount
-		del correctAlts
-		del workflowAlts
+		#del indCount
+		#del correctAlts
+		#del workflowAlts
 		delList = []
 		for i in xrange(len(notFound)):
 			if n[0] in nonUniqueDict:
