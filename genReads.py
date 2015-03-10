@@ -57,6 +57,8 @@ DEFAULT_MBD = 95							# default minimum bed-file region size to consider for ta
 DEFAULT_BCV = 0								# default coverage in non-targeted regions
 DEFAULT_QSM = 'models/qModel_AlvaroPhix.p'	# default quality-score model
 DEFAULT_SSM = 'models/SSE_model1_pIRS.p'	# default sequencing-substituion-error model
+DEFAULT_SIE = 0.01							# default sequencing-indel-error frequency
+DEFAULT_SII = 0.4							# default frequency of insertion errors
 
 PARSER = optparse.OptionParser('python %prog [options] -r <ref.fa> -o <out.prefix>',description=DESC,version="%prog v"+str(VERS))
 
@@ -69,6 +71,8 @@ PARSER.add_option('-c',    help='Average coverage [%default]',                  
 PARSER.add_option('-C',    help='Avg coverage in non-targeted regions [%default]',    dest='BCV',     default=DEFAULT_BCV, action='store',      metavar='<float>')
 PARSER.add_option('-f',    help='Average fragment length [%default]',                 dest='FLEN',    default=DEFAULT_FLN, action='store',      metavar='<int>')
 PARSER.add_option('-F',    help='Fragment length std [%default]',                     dest='FSTD',    default=DEFAULT_FSD, action='store',      metavar='<int>')
+PARSER.add_option('-i',    help='P(SIE error | sequencing error occurs) [%default]',  dest='SIER',    default=DEFAULT_SIE, action='store',      metavar='<float>')
+PARSER.add_option('-I',    help='P(insertion error | SIE error occurs) [%default]',   dest='SIEI',    default=DEFAULT_SII, action='store',      metavar='<float>')
 PARSER.add_option('-l',    help='Read length [%default]',                             dest='RLEN',    default=DEFAULT_RLN, action='store',      metavar='<int>')
 PARSER.add_option('-o',    help='Output filename prefix',                             dest='OUT',                          action='store',      metavar='<out.prefix>')
 PARSER.add_option('-q',    help='Quality score model [%default]',                     dest='QSM',     default=DEFAULT_QSM, action='store',      metavar='<model.p>')
@@ -133,10 +137,13 @@ FRAGMENT_STD   = int(OPTS.FSTD)
 COV_WINDOW     = int(OPTS.WIN)
 MIN_PROBE_LEN  = int(OPTS.MBD)
 
-AVG_SSE        = float(OPTS.SER)
-if AVG_SSE != 0.0:
+AVG_SER        = float(OPTS.SER)
+if AVG_SER != 0.0:
 	SEQUENCING_SNPS    = 1
-	SEQUENCING_INDELS  = 0	# not supported yet
+	if SIE_FREQ != 0.0:
+		SEQUENCING_INDELS = 1
+	else:
+		SEQUENCING_INDELS = 0
 else:
 	SEQUENCING_SNPS    = 0
 	SEQUENCING_INDELS  = 0
@@ -249,9 +256,9 @@ else:
 	SSE_MODEL = OPTS.SSM
 
 # if a sequencing error occurs, what are the odds it's an indel?
-SIE_RATE = 0.01
+SIE_RATE = float(OPTS.SIER)
 # if a sequencing indel error occurs, what are the odds it's an insertion as opposed to a deletion?
-SIE_INS_FREQ = 0.4
+SIE_INS_FREQ = float(OPTS.SIEI)
 # if a sequencing insertion error occurs, what's the probability of it being an A, C, G, T...
 SIE_NUCL = [0.25, 0.25, 0.25, 0.25]
 
@@ -284,8 +291,14 @@ if AVG_COVERAGE <= 0.:
 if AVG_VAR_FREQ < 0. or AVG_VAR_FREQ >= 1.:
 	print 'Error: Average variant frequency must be between [0,1)'
 	exit(1)
-if AVG_SSE < 0. or AVG_SSE >= 1.:
-	print 'Error: Average SSE rate must be between [0,1)'
+if AVG_SER < 0. or AVG_SER >= 1.:
+	print 'Error: Average sequencing error rate (SER) rate must be between [0,1)'
+	exit(1)
+if SIE_RATE < 0. or SIE_RATE >= 1.:
+	print 'Error: Sequencing indel error (SIE) frequency must be between [0,1)'
+	exit(1)
+if SIE_INS_FREQ < 0. or SIE_INS_FREQ >= 1.:
+	print 'Error: Sequencing insertion error frequency must be between [0,1)'
 	exit(1)
 if HET_VAR < 0. or HET_VAR >= 1.:
 	print 'Error: Heterozygous variant ratio must be between [0,1)'
@@ -337,7 +350,7 @@ if not os.path.isfile(QSCORE_MODEL):
 else:
 	maxQScore = pickle.load(open(QSCORE_MODEL,'rb'))[2][-1]
 	maxPerror = 10.**(-maxQScore/10.)
-	if (AVG_SSE > 1.0 or AVG_SSE <= maxPerror) and AVG_SSE != 0.:
+	if (AVG_SER > 1.0 or AVG_SER <= maxPerror) and AVG_SER != 0.:
 		print 'Error: Average SSE rate must be between: ({0:.6f}, 1.0], or == 0'.format(maxPerror)
 		exit(1)
 
@@ -417,8 +430,8 @@ def main():
 		learnedCycles = len(allPMFs)
 		nQscores = len(allPMFs[0])
 
-		targetQscore = int(-10.*np.log10(AVG_SSE))
-		print '\nDesired P(error):\t\t','{0:.6f}'.format(AVG_SSE),'( phred:',targetQscore,')'
+		targetQscore = int(-10.*np.log10(AVG_SER))
+		print '\nDesired P(error):\t\t','{0:.6f}'.format(AVG_SER),'( phred:',targetQscore,')'
 		qScoreShift = 0
 		prevShift   = 0
 		pprevShift  = 0
@@ -476,8 +489,8 @@ def main():
 				#print [n-qOffset for n in q1]
 				avgError.append(sum([pError[n] for n in q1])/READLEN)
 			modelError  = (sum(avgError)/len(avgError))
-			qScoreShift += int(-10.*np.log10(AVG_SSE)) - int(-10.*np.log10(modelError))
-			sseScalar = AVG_SSE/modelError
+			qScoreShift += int(-10.*np.log10(AVG_SER)) - int(-10.*np.log10(modelError))
+			sseScalar = AVG_SER/modelError
 			if printFirst:
 				printFirst = 0
 				print 'Avg P(error) of Input Model:\t','{0:.6f}'.format(modelError),'( phred:',int(-10.*np.log10(modelError)),')'
@@ -491,7 +504,7 @@ def main():
 
 	else:
 		plusMinusSSE = 0.5
-		positionSSErate = np.linspace((1-plusMinusSSE)*AVG_SSE,(1+plusMinusSSE)*AVG_SSE,READLEN).tolist()
+		positionSSErate = np.linspace((1-plusMinusSSE)*AVG_SER,(1+plusMinusSSE)*AVG_SER,READLEN).tolist()
 
 	# create cumulative probability list for fragment length
 	cpFrag = [float(n)/sum(FRAGPROB) for n in FRAGPROB]
@@ -1298,7 +1311,7 @@ def main():
 
 		tt = time.time()
 		if not SEQUENCING_QSCORES:
-			if AVG_SSE == 0.:
+			if AVG_SER == 0.:
 				q1 = bytearray([Qscores[-1]+qOffset]*READLEN)
 			else:
 				q1 = bytearray([DUMMY_QSCORE+qOffset]*READLEN)
@@ -1911,12 +1924,11 @@ def main():
 		rfOut.write('Variant Freq:\t'+str(AVG_VAR_FREQ)+'\n')
 
 		if SEQUENCING_SNPS:
-			rfOut.write('SSE rate:\t\t'+str(AVG_SSE)+'\n')
+			rfOut.write('SSE rate:\t\t'+str(AVG_SER)+'\n')
 		else:
 			rfOut.write('SSE rate:\t\t0.0\n')
 		if SEQUENCING_INDELS:
-			#rfOut.write()
-			print 'Not implemented yet, sorry :('
+			rfOut.write('SIE rate:\t\t'+str(SIE_RATE)+' of all sequencing errors\n')
 		else:
 			rfOut.write('SIE rate:\t\t0.0\n')
 		if SEQUENCING_QSCORES:

@@ -499,8 +499,8 @@ def main():
 		#
 		#	Deduce which variants are FP / FN
 		#
-		for var in sorted(workflowHashed.keys()):
-			if var in correctHashed:
+		for var in sorted(correctHashed.keys()):
+			if var in workflowHashed:
 
 				if correctHashed[var] == 1:
 					correctHashed[var] = 2
