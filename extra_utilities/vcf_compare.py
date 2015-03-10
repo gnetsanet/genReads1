@@ -543,8 +543,8 @@ def main():
 		#del workflowAlts
 		delList = []
 		for i in xrange(len(notFound)):
-			if n[0] in nonUniqueDict:
-				nonUniqueDict[n[0]].append(n)
+			if notFound[i][0] in nonUniqueDict:
+				nonUniqueDict[notFound[i][0]].append(notFound[i])
 				delList.append(i)
 		delList = sorted(delList,reverse=True)
 		for di in delList:
