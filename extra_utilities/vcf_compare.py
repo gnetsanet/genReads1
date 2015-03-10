@@ -297,21 +297,43 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 	return (v_Hashed, v_Alts, v_Cov, v_AF, v_Qual, v_TargLen, nBelowMinRLen, line_unique, var_filtered, var_merged, hash_coll)
 
 
-def condenseAlts(listIn,altsList):
-	to_condense   = {}
-	ext_info_dict = {}
-	for i in xrange(len(listIn)):
-		var = listIn[i]
-		if var in altsList:
-			concat = (var[0],var[1],','.join([n[2] for n in altsList[var]]))
-			if concat not in to_condense:
-				to_condense[concat] = []
-			to_condense[concat].append(i)
-	delList = [j for i in to_condense.values() for j in i]
-	outList = [listIn[i] for i in xrange(len(listIn)) if i not in delList]
-	for n in to_condense.keys():
-		outList.append(n)
-	return outList
+###def condenseAlts(listIn,altsList):
+###	to_condense   = {}
+###	ext_info_dict = {}
+###	for i in xrange(len(listIn)):
+###		var = listIn[i]
+###		if var in altsList:
+###			concat = (var[0],var[1],','.join([n[2] for n in altsList[var]]))
+###			if concat not in to_condense:
+###				to_condense[concat] = []
+###			to_condense[concat].append(i)
+###	delList = [j for i in to_condense.values() for j in i]
+###	outList = [listIn[i] for i in xrange(len(listIn)) if i not in delList]
+###	for n in to_condense.keys():
+###		outList.append(n)
+###	return outList
+
+def condenseByPos(listIn):
+	varListOfInterest = [n for n in listIn]
+	indCount = {}
+	for n in varListOfInterest:
+		c = n[0]
+		if c not in indCount:
+			indCount[c] = 0
+		indCount[c] += 1
+	nonUniqueDict = {n:[] for n in sorted(indCount.keys()) if indCount[n] > 1}
+	delList = []
+	for i in xrange(len(varListOfInterest)):
+		if varListOfInterest[i][0] in nonUniqueDict:
+			nonUniqueDict[varListOfInterest[i][0]].append(varListOfInterest[i])
+			delList.append(i)
+	delList = sorted(delList,reverse=True)
+	for di in delList:
+		del varListOfInterest[di]
+	for v in nonUniqueDict.values():
+		var = (v[0][0],v[0][1],','.join([n[2] for n in v]))
+		varListOfInterest.append(var)
+	return varListOfInterest
 
 
 def main():
@@ -471,49 +493,6 @@ def main():
 		#
 		#	Deduce which variants are FP / FN
 		#
-		###nPerfect = 0
-		###FPvariants = []
-		###alts_to_ignore = []
-		###for var in sorted(workflowHashed.keys()):
-		###	if var in correctHashed:
-		###		nPerfect += 1
-		###		if correctHashed[var] != 3:
-		###			correctHashed[var] = 2
-		###		if var in correctAlts:				# ignore golden alts if one of them was found
-		###			alreadySeen = True
-		###			for v2 in correctAlts[var]:
-		###				if correctHashed[v2] != 3:
-		###					correctHashed[v2] = 3
-		###					alreadySeen = False
-		###			if alreadySeen:
-		###				nPerfect -= 1
-		###		if var in workflowAlts:
-		###			alts_to_ignore.extend(workflowAlts[var])
-		###	else:
-		###		FPvariants.append(var)
-		####	remove any trace of workflow variants who were not found, but whose alternate was
-		###for i in xrange(len(FPvariants)-1,-1,-1):
-		###	if FPvariants[i] in alts_to_ignore:
-		###		del FPvariants[i]
-
-		#
-		#	Deduce which variants are FP / FN
-		#
-		###for var in sorted(correctHashed.keys()):
-		###	if var in workflowHashed:
-		###
-		###		if correctHashed[var] == 1:
-		###			correctHashed[var] = 2
-		###		if workflowHashed[var] == 1:
-		###			workflowHashed[var] = 2
-		###
-		###		if var in correctAlts:
-		###			for v2 in correctAlts[var]:
-		###				correctHashed[v2] = 3
-		###		if var in workflowAlts:
-		###			for v2 in workflowAlts[var]:
-		###				workflowHashed[v2] = 3
-
 		solvedInds = {}
 		for var in correctHashed.keys():
 			if var in workflowHashed or var[0] in solvedInds:
@@ -525,8 +504,6 @@ def main():
 				correctHashed[var]  = 2
 				workflowHashed[var] = 2
 		nPerfect = len(solvedInds)
-
-		print 'gnaaa',len(correctHashed),correctHashed.values().count(1)
 		
 		# correctHashed[var] = 1: were not found
 		#                    = 2: should be discluded because we were found
@@ -538,57 +515,12 @@ def main():
 		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
 		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
 		#
-		indCount = {}
-		for n in notFound:
-			c = n[0]
-			if c not in indCount:
-				indCount[c] = 0
-			indCount[c] += 1
-		nonUniqueDict = {n:[] for n in sorted(indCount.keys()) if indCount[n] > 1}
-		delList = []
-		for i in xrange(len(notFound)):
-			if notFound[i][0] in nonUniqueDict:
-				nonUniqueDict[notFound[i][0]].append(notFound[i])
-				delList.append(i)
-		delList = sorted(delList,reverse=True)
-		for di in delList:
-			del notFound[di]
-		for v in nonUniqueDict.values():
-			var = (v[0][0],v[0][1],','.join([n[2] for n in v]))
-			notFound.append(var)
-		
-		indCount = {}
-		for n in notFound:
-			c = n[0]
-			if c not in indCount:
-				indCount[c] = 0
-			indCount[c] += 1
-		for k in sorted(indCount.keys()):
-			if indCount[k] > 1:
-				print k, indCount[k]
-		
-
-		#
-		#	condense all variants who have alternate alleles and were *not* found to have perfect matches
-		#	into a single variant again. These will not be included in the candidates for equivalency checking. Sorry!
-		#
-		###notFound   = condenseAlts(notFound,correctAlts)
-		###FPvariants = condenseAlts(FPvariants,workflowAlts)
-
-		indCount = {}
-		for n in notFound:
-			c = n[0]
-			if c not in indCount:
-				indCount[c] = 0
-			indCount[c] += 1
-		for k in sorted(indCount.keys()):
-			if indCount[k] >= 2:
-				print k, indCount[k]
+		notFound   = condenseByPos(notFound)
+		FPvariants = condenseByPos(FPvariants)
 
 		#
 		#	tally up some values, if there are no golden variants lets save some CPU cycles and move to the next ref
 		#
-		print '\nrawr:',nPerfect,len(notFound),'\n'
 		totalGoldenVariants   = nPerfect + len(notFound)
 		totalWorkflowVariants = nPerfect + len(FPvariants)
 		if totalGoldenVariants == 0:
