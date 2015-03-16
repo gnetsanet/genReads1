@@ -716,7 +716,7 @@ def main():
 						pos = int(splt[1])
 						rnt = splt[3]
 						ant = splt[4]
-						inf = splt[7]
+						inf = ';'+splt[7]+';'
 						# structural variants aren't supported yet, sorry!
 						if (splt[2] != '.') or ('[' in ant) or (']' in ant) or (':' in ant) or ('SVTYPE' in splt[7]):
 							print "skipping variant:",line
@@ -726,8 +726,8 @@ def main():
 							ant = ant.split(',')[0]
 						# lets use the AF field, if present, to force a variant to be heterozygous
 						myAF = 1.
-						if 'AF=' in inf:
-							myAF = float(re.findall(r"AF=.*?(?=;)",inf)[0][3:].split(',')[0])
+						if ';AF=' in inf:
+							myAF = float(re.findall(r";AF=.*?(?=;)",inf)[0][3:].split(',')[0])
 							if myAF < 0.01 or myAF > 0.99:
 								myAF = 1.
 						# snps
