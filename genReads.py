@@ -382,7 +382,7 @@ if SNP_FREQ <= 0.0 or SNP_FREQ >= 1.0:
 if INDEL_FREQ <= 0.0 or INDEL_FREQ >= 1.0:
 	NATURAL_INDELS = False
 	INDEL_MUT  = [0.1]		# junk placeholder values that won't be used, but needed to prevent div/0 errors
-	INDEL_FREQ = [0.1]		#
+	INDEL_FREQ = 0.1		#
 
 
 """////////////////////////////////////////////////
