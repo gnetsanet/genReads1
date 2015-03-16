@@ -377,6 +377,11 @@ MAX_INDEL  = len(INDEL_MUT)
 # probability of any indel occuring
 INDEL_FREQ = sum(INDEL_MUT)
 
+if SNP_FREQ <= 0.0 or SNP_FREQ >= 1.0:
+	NATURAL_SNPS = False
+if INDEL_FREQ <= 0.0 or INDEL_FREQ >= 1.0:
+	NATURAL_INDELS = False
+
 
 """////////////////////////////////////////////////
 ////////////           MAIN()          ////////////
