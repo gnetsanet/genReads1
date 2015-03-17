@@ -743,17 +743,13 @@ def main():
 							for i in xrange(len(rnt)):
 								if chr(myDatCat[pos+i-1]).upper() != rnt[i]:
 									print "skipping variant [!=REF]:",line
-									exit(1)
 									continue
 								input_snps.append((pos+i,rnt[i],ant[i]))
 								input_snps_AF.append(myAF)
 						# insertion
 						elif len(rnt) == 1 and len(ant) > 1:
 							if chr(myDatCat[pos-1]).upper() != rnt:
-								print ''
-								print chr(myDatCat[pos-1]).upper(), rnt
 								print "skipping variant [!=REF]:",line
-								exit(1)
 								continue
 							v = ((pos,ant[1:]),'BI')
 							SVsToAttempt.append(v)
@@ -762,10 +758,7 @@ def main():
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
 							if myDatCat[pos-1:pos+len(rnt)-1].upper() != rnt:
-								print ''
-								print myDatCat[pos-1:pos+len(rnt)-1].upper(), rnt
 								print "skipping variant [!=REF]:",line
-								exit(1)
 								continue
 							v = ((pos,len(rnt)-1),'BD')
 							SVsToAttempt.append(v)
