@@ -758,7 +758,7 @@ def main():
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
 							if myDatCat[pos+1:pos+len(rnt)-1].upper() != rnt:
-								print myDatCat[pos+1:pos+len(rnt)-1].upper(), rnt
+								print myDatCat[pos+1:pos+len(rnt)+1].upper(), rnt
 								print "skipping variant [!=REF]:",line
 								exit(1)
 								continue
