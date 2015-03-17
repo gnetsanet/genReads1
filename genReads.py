@@ -741,7 +741,9 @@ def main():
 						if len(rnt) == len(ant):
 							for i in xrange(len(rnt)):
 								if myDat[pos+i-1] != rnt[i]:
+									print myDat[pos+i-2], myDat[pos+i-1], myDat[pos+i]
 									print "skipping variant [!=REF]:",line
+									exit(1)
 									continue
 								input_snps.append((pos+i,rnt[i],ant[i]))
 								input_snps_AF.append(myAF)
