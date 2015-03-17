@@ -722,8 +722,8 @@ def main():
 					splt = line.split('\t')
 					if splt[0] == refName:
 						pos = int(splt[1])
-						rnt = splt[3]
-						ant = splt[4]
+						rnt = splt[3].upper()
+						ant = splt[4].upper()
 						inf = ';'+splt[7]+';'
 						# structural variants aren't supported yet, sorry!
 						if ('[' in ant) or (']' in ant) or (':' in ant) or ('SVTYPE' in splt[7]):
@@ -741,16 +741,14 @@ def main():
 						# snps
 						if len(rnt) == len(ant):
 							for i in xrange(len(rnt)):
-								if myDatCat[pos+i-1] != rnt[i]:
-									print myDatCat[pos+i-2], myDatCat[pos+i-1], myDatCat[pos+i], rnt[i]
+								if chr(myDatCat[pos+i-1]).upper() != rnt[i]:
 									print "skipping variant [!=REF]:",line
-									exit(1)
 									continue
 								input_snps.append((pos+i,rnt[i],ant[i]))
 								input_snps_AF.append(myAF)
 						# insertion
 						elif len(rnt) == 1 and len(ant) > 1:
-							if myDatCat[pos+i-1] != rnt[i]:
+							if chr(myDatCat[pos+i-1]).upper() != rnt[i]:
 								print "skipping variant [!=REF]:",line
 								continue
 							v = ((pos,ant[1:]),'BI')
@@ -760,7 +758,9 @@ def main():
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
 							if myDatCat[pos+i-1:pos+i+len(rnt)-1] != rnt:
+								print myDatCat[pos+i-1:pos+i+len(rnt)-1], rnt
 								print "skipping variant [!=REF]:",line
+								exit(1)
 								continue
 							v = ((pos,len(rnt)-1),'BD')
 							SVsToAttempt.append(v)
