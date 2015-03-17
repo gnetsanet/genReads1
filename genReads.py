@@ -714,6 +714,7 @@ def main():
 		input_snps_AF = []
 		input_inds    = {}
 		input_inds_AF = {}
+		myDatCat      = bytearray(''.join(myDat))
 		if INPUT_VCF != None:
 			invcf = open(INPUT_VCF,'r')
 			for line in invcf:
@@ -740,8 +741,8 @@ def main():
 						# snps
 						if len(rnt) == len(ant):
 							for i in xrange(len(rnt)):
-								if myDat[pos+i-1] != rnt[i]:
-									print myDat[pos+i-2], myDat[pos+i-1], myDat[pos+i]
+								if myDatCat[pos+i-1] != rnt[i]:
+									print myDatCat[pos+i-2], myDatCat[pos+i-1], myDatCat[pos+i]
 									print "skipping variant [!=REF]:",line
 									exit(1)
 									continue
@@ -749,7 +750,7 @@ def main():
 								input_snps_AF.append(myAF)
 						# insertion
 						elif len(rnt) == 1 and len(ant) > 1:
-							if myDat[pos+i-1] != rnt[i]:
+							if myDatCat[pos+i-1] != rnt[i]:
 								print "skipping variant [!=REF]:",line
 								continue
 							v = ((pos,ant[1:]),'BI')
@@ -758,7 +759,7 @@ def main():
 							input_inds_AF[tuple(v)] = myAF
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
-							if myDat[pos+i-1:pos+i+len(rnt)-1] != rnt:
+							if myDatCat[pos+i-1:pos+i+len(rnt)-1] != rnt:
 								print "skipping variant [!=REF]:",line
 								continue
 							v = ((pos,len(rnt)-1),'BD')
@@ -770,6 +771,7 @@ def main():
 							print "skipping variant [confused]:",line
 							continue
 			invcf.close()
+		del myDatCat
 		nIndels += len(input_inds)
 
 
