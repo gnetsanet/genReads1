@@ -743,6 +743,7 @@ def main():
 							for i in xrange(len(rnt)):
 								if chr(myDatCat[pos+i-1]).upper() != rnt[i]:
 									print "skipping variant [!=REF]:",line
+									exit(1)
 									continue
 								input_snps.append((pos+i,rnt[i],ant[i]))
 								input_snps_AF.append(myAF)
@@ -752,6 +753,7 @@ def main():
 								print ''
 								print chr(myDatCat[pos-1]).upper(), rnt
 								print "skipping variant [!=REF]:",line
+								exit(1)
 								continue
 							v = ((pos,ant[1:]),'BI')
 							SVsToAttempt.append(v)
@@ -771,7 +773,7 @@ def main():
 							input_inds_AF[tuple(v)] = myAF
 						# otherwise I have no idea, and don't feel like figuring it out now.
 						else:
-							print "skipping variant [confused]:",line
+							#print "skipping variant [confused]:",line
 							continue
 			invcf.close()
 		del myDatCat
