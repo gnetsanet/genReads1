@@ -742,7 +742,7 @@ def main():
 						if len(rnt) == len(ant):
 							for i in xrange(len(rnt)):
 								if myDatCat[pos+i-1] != rnt[i]:
-									print myDatCat[pos+i-2], myDatCat[pos+i-1], myDatCat[pos+i]
+									print myDatCat[pos+i-2], myDatCat[pos+i-1], myDatCat[pos+i], rnt[i]
 									print "skipping variant [!=REF]:",line
 									exit(1)
 									continue
