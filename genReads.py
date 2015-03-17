@@ -748,7 +748,9 @@ def main():
 								input_snps_AF.append(myAF)
 						# insertion
 						elif len(rnt) == 1 and len(ant) > 1:
-							if chr(myDatCat[pos+1]).upper() != rnt:
+							if chr(myDatCat[pos-1]).upper() != rnt:
+								print ''
+								print chr(myDatCat[pos-1]).upper(), rnt
 								print "skipping variant [!=REF]:",line
 								continue
 							v = ((pos,ant[1:]),'BI')
@@ -757,8 +759,9 @@ def main():
 							input_inds_AF[tuple(v)] = myAF
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
-							if myDatCat[pos+1:pos+len(rnt)-1].upper() != rnt:
-								print myDatCat[pos+1:pos+len(rnt)+1].upper(), rnt
+							if myDatCat[pos-1:pos+len(rnt)-1].upper() != rnt:
+								print ''
+								print myDatCat[pos-1:pos+len(rnt)-1].upper(), rnt
 								print "skipping variant [!=REF]:",line
 								exit(1)
 								continue
