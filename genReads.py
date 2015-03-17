@@ -757,7 +757,7 @@ def main():
 							input_inds_AF[tuple(v)] = myAF
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
-							if myDatCat[pos+i-1:pos+i+len(rnt)-1] != rnt:
+							if myDatCat[pos+i-1:pos+i+len(rnt)-1].upper() != rnt:
 								print myDatCat[pos+i-1:pos+i+len(rnt)-1], rnt
 								print "skipping variant [!=REF]:",line
 								exit(1)
