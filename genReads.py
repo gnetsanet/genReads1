@@ -725,8 +725,8 @@ def main():
 						ant = splt[4]
 						inf = ';'+splt[7]+';'
 						# structural variants aren't supported yet, sorry!
-						if (splt[2] != '.') or ('[' in ant) or (']' in ant) or (':' in ant) or ('SVTYPE' in splt[7]):
-							print "skipping variant:",line
+						if ('[' in ant) or (']' in ant) or (':' in ant) or ('SVTYPE' in splt[7]):
+							print "skipping variant [invalid symbols]:",line
 							continue
 						# if multiple alternate alleles, lets just use first one...
 						if ',' in ant:
@@ -740,23 +740,32 @@ def main():
 						# snps
 						if len(rnt) == len(ant):
 							for i in xrange(len(rnt)):
+								if myDat[pos+i-1] != rnt[i]:
+									print "skipping variant [!=REF]:",line
+									continue
 								input_snps.append((pos+i,rnt[i],ant[i]))
 								input_snps_AF.append(myAF)
 						# insertion
 						elif len(rnt) == 1 and len(ant) > 1:
+							if myDat[pos+i-1] != rnt[i]:
+								print "skipping variant [!=REF]:",line
+								continue
 							v = ((pos,ant[1:]),'BI')
 							SVsToAttempt.append(v)
 							input_inds[(pos,rnt,ant)] = 1
 							input_inds_AF[tuple(v)] = myAF
 						# deletion
 						elif len(rnt) > 1 and len(ant) == 1:
+							if myDat[pos+i-1:pos+i+len(rnt)-1] != rnt:
+								print "skipping variant [!=REF]:",line
+								continue
 							v = ((pos,len(rnt)-1),'BD')
 							SVsToAttempt.append(v)
 							input_inds[(pos,rnt,ant)] = 1
 							input_inds_AF[tuple(v)] = myAF
 						# otherwise I have no idea, and don't feel like figuring it out now.
 						else:
-							print "skipping variant:",line
+							print "skipping variant [confused]:",line
 							continue
 			invcf.close()
 		nIndels += len(input_inds)
