@@ -1520,8 +1520,9 @@ def main():
 							elif thij[0] == 'I':
 								buflen    = min([READLEN,thij[1]])
 								extra_adj = max([0,thij[3]+adj-r2f])
-								if len(currentDatRC[:revoff-extra_adj+adj]) < buflen:
-									print '\n\nproblem, captain!\n\n'
+								if len(currentDatRC[:revoff-extra_adj+adj]) < buflen:	# not enough content left to fill in gap in this window. skip
+									#print '\n\nproblem, captain!\n\n'
+									continue
 								else:
 									r2 = bytearray([TO_UPPER_COMP[n] for n in r2][::-1])
 									(e1, e2) = (revoff-extra_adj+adj-buflen, revoff-extra_adj+adj)
