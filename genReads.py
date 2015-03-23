@@ -1465,7 +1465,9 @@ def main():
 				# if indel is heterozygous, lets trade it out for the ref allele and remove it from cigar-string computations (with corresponding allele balance probability of course)
 				#
 				skipTheseInds = []
-				adjustedVariants = {tuple(n):0 for n in hitInds}
+				adjustedVariants = {}
+				for n in hitInds:
+					adjustedVariants[tuple(n)] = 0
 				for j in xrange(len(hitInds)):
 					thij     = tuple(hitInds[j])
 					adj      = adjustedVariants[thij]
