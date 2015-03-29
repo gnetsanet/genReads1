@@ -302,7 +302,11 @@ def condenseByPos(listIn):
 		if c not in indCount:
 			indCount[c] = 0
 		indCount[c] += 1
-	nonUniqueDict = {n:[] for n in sorted(indCount.keys()) if indCount[n] > 1}
+	#nonUniqueDict = {n:[] for n in sorted(indCount.keys()) if indCount[n] > 1}		# the python 2.7 way
+	nonUniqueDict = {}
+	for n in sorted(indCount.keys()):
+		if indCount[n] > 1:
+			nonUniqueDict[n] = []
 	delList = []
 	for i in xrange(len(varListOfInterest)):
 		if varListOfInterest[i][0] in nonUniqueDict:
