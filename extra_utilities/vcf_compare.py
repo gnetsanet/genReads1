@@ -715,8 +715,8 @@ def main():
 	#if NO_PLOT:
 	if True:
 		print '\n#unmappable:  ',len(set1)
-		print '\n#low_coverage:',len(set2)
-		print '\n#low_VAF:     ',len(set3)
+		print '#low_coverage:',len(set2)
+		print '#low_VAF:     ',len(set3)
 	print '\n**********************************\n'
 
 
