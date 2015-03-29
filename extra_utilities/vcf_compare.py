@@ -585,7 +585,7 @@ def main():
 		if FAST == False:
 			znE += nEquiv
 		if BEDFILE != None:
-			zbM += nBelowMinRLen
+			zbM += correctBelowMinRLen
 
 		#
 		#	try to identify a reason for FN variants:
