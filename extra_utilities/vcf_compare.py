@@ -708,6 +708,10 @@ def main():
 		print '\nNumber of golden variants located in targeted regions that were too small to be sampled from:',zbM
 	if FAST:
 		print "\nWarning! Running with '--fast' means that identical variants denoted differently between the two vcfs will not be detected! The values above may be lower than the true accuracy."
+	if NO_PLOT:
+		print '\n#unmappable:  ',len(set1)
+		print '\n#low_coverage:',len(set2)
+		print '\n#low_VAF:     ',len(set3)
 	print '\n**********************************\n'
 
 
