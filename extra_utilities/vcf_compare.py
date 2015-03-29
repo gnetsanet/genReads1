@@ -188,11 +188,7 @@ def parseLine(splt,colDict,colSamp):
 	af = None
 	if 'INFO' in colDict and 'AF=' in splt[colDict['INFO']]:
 		info = splt[colDict['INFO']]+';'
-		try:
-			af  = re.findall(r"AF=.*?(?=;)",info)[0][3:]
-		except IndexError:
-			print info
-			exit(1)
+		af  = re.findall(r"AF=.*?(?=;)",info)[0][3:]
 	#	check FORMAT/SAMPLE for AF second:
 	elif 'FORMAT' in colDict and len(colSamp):
 		format = splt[colDict['FORMAT']]+':'
@@ -235,7 +231,7 @@ def parseVCF(VCF_FILENAME,refName,targRegionsFl,outFile,outBool):
 			if len(colDict) == 0:
 				print '\n\nError: VCF has no header?\n'+VCF_FILENAME+'\n\n'
 				exit(1)
-			splt = line.split('\t')
+			splt = line[:-1].split('\t')
 			if splt[0] == refName:
 
 				var  = (int(splt[1]),splt[3],splt[4])
