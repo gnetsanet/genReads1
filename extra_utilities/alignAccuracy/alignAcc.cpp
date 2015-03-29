@@ -631,8 +631,18 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				cout << endl << "tbd" << endl;
-				exit(1);
+				vector<StringRef> const line_splt = split3( readName, '-' );
+				int correctPos = 0;
+				string correctPosStr(line_splt[1].begin(),line_splt[1].end());
+				correctPos = atoi(correctPosStr.c_str());
+				if (abs(correctPos - pos - 1) <= WITHIN_OK)
+				{
+					//
+				}
+				else
+				{
+					nIncorrectlyMapped += 1;
+				}
 			}
 		}
 
