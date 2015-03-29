@@ -188,7 +188,11 @@ def parseLine(splt,colDict,colSamp):
 	af = None
 	if 'INFO' in colDict and 'AF=' in splt[colDict['INFO']]:
 		info = splt[colDict['INFO']]+';'
-		af  = re.findall(r"AF=.*?(?=;)",info)[0][3:]
+		try:
+			af  = re.findall(r"AF=.*?(?=;)",info)[0][3:]
+		except IndexError:
+			print info
+			exit(1)
 	#	check FORMAT/SAMPLE for AF second:
 	elif 'FORMAT' in colDict and len(colSamp):
 		format = splt[colDict['FORMAT']]+':'
