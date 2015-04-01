@@ -38,13 +38,13 @@ def main():
 
 	# sort by job order so we put the files back together in a sensible order
 	fq1List = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in fq1List])
-	fq1List = [n[0] for n in fq1List]
+	fq1List = [n[1] for n in fq1List]
 	fq2List = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in fq2List])
-	fq2List = [n[0] for n in fq2List]
+	fq2List = [n[1] for n in fq2List]
 	samList = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in samList])
-	samList = [n[0] for n in samList]
+	samList = [n[1] for n in samList]
 	vcfList = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in vcfList])
-	vcfList = [n[0] for n in vcfList]
+	vcfList = [n[1] for n in vcfList]
 
 	tt = time.time()
 	print 'merging files...'
