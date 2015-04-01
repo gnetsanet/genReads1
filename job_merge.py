@@ -31,10 +31,20 @@ def writeInChunks(of,f):
 def main():
 	dn = sys.argv[1]
 
-	fq1List = sorted(glob.glob(dn+'_job*read1.fq'))
-	fq2List = sorted(glob.glob(dn+'_job*read2.fq'))
-	samList = sorted(glob.glob(dn+'_job*.sam'))
-	vcfList = sorted(glob.glob(dn+'_job*.vcf'))
+	fq1List = glob.glob(dn+'_job*read1.fq')
+	fq2List = glob.glob(dn+'_job*read2.fq')
+	samList = glob.glob(dn+'_job*.sam')
+	vcfList = glob.glob(dn+'_job*.vcf')
+
+	# sort by job order so we put the files back together in a sensible order
+	fq1List = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in fq1List])
+	fq1List = [n[0] for n in fq1List]
+	fq2List = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in fq2List])
+	fq2List = [n[0] for n in fq2List]
+	samList = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in samList])
+	samList = [n[0] for n in samList]
+	vcfList = sorted([(int(re.findall(r"_job\d+",n)[0][4:]), n) for n in vcfList])
+	vcfList = [n[0] for n in vcfList]
 
 	tt = time.time()
 	print 'merging files...'
