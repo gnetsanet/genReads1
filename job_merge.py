@@ -39,19 +39,21 @@ def main():
 	tt = time.time()
 	print 'merging files...'
 
-	of = open(dn+'_read1.fq','wb')
-	for fn in fq1List:
-		f = open(fn,'r')
-		writeInChunks(of,f)
-		f.close()
-	of.close()
+	#of = open(dn+'_read1.fq','wb')
+	#for fn in fq1List:
+	#	f = open(fn,'r')
+	#	writeInChunks(of,f)
+	#	f.close()
+	#of.close()
+	os.system('cat '+' '.join(fq1List)+' > '+dn+'_read1.fq')
 
-	of = open(dn+'_read2.fq','wb')
-	for fn in fq2List:
-		f = open(fn,'r')
-		writeInChunks(of,f)
-		f.close()
-	of.close()
+	#of = open(dn+'_read2.fq','wb')
+	#for fn in fq2List:
+	#	f = open(fn,'r')
+	#	writeInChunks(of,f)
+	#	f.close()
+	#of.close()
+	os.system('cat '+' '.join(fq2List)+' > '+dn+'_read2.fq')
 
 	if len(samList) > 0:
 		of = open(dn+'_golden.sam','wb')

@@ -129,6 +129,7 @@ int main(int argc, char *argv[])
 	unsigned long int uniqueReads = 0;
 	unsigned long int nUnmapped = 0;
 	unsigned long int nIncorrectlyMapped = 0;
+	unsigned long int nIncorrectAndMulti = 0;
 
 	countMap refLengthByReference;
 	double multiMappedReadCount = 0.0;
@@ -500,12 +501,14 @@ int main(int argc, char *argv[])
 			nUnmapped += 1;
 		else
 		{
+			string alignerPrefix = myAligner.substr(0,3);
 			if (isNotPrimary || isSupplement)
 				isMultimapped = true;
 			else if (NH_value > 1)
 				isMultimapped = true;
-			//else if (mapQ <= 3)
-			//	isMultimapped = true;
+			// a special case for BWA:
+			else if (alignerPrefix == "bwa" && mapQ <= 3)
+				isMultimapped = true;
 		}
 		
 		//
@@ -598,6 +601,7 @@ int main(int argc, char *argv[])
 		//
 		// so, did the read map to the correct position?
 		//
+		bool isIncorrectlyMapped = false;
 		if(!isUnmapped)
 		{
 			if (isPaired)
@@ -626,7 +630,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					nIncorrectlyMapped += 1;
+					isIncorrectlyMapped = true;
 				}
 			}
 			else
@@ -641,8 +645,16 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					nIncorrectlyMapped += 1;
+					isIncorrectlyMapped = true;
 				}
+			}
+		}
+		if (isIncorrectlyMapped)
+		{
+			nIncorrectlyMapped += 1;
+			if (isMultimapped)
+			{
+				nIncorrectAndMulti += 1;
 			}
 		}
 
@@ -677,6 +689,7 @@ int main(int argc, char *argv[])
 	long unsigned int uniqueReadIDs   = (uniqueReads + nUnmapped + multimapped_int);
 	float unmapPercent = 100.0 * nUnmapped / (float)nRecords;
 	float incorrectPercent = 100.0 * nIncorrectlyMapped / (float)nRecords;
+	float incorMultPercent = 100.0 * nIncorrectAndMulti / (float)nRecords;
 
 	cout << "\n";
 	cout << ">>RECORDS_READ\t\t" << nRecords << "\n";
@@ -684,6 +697,7 @@ int main(int argc, char *argv[])
 	cout << ">>MULTI_MAPPED_IDS\t" << multimapped_int << "\n";
 	cout << ">>UNMAPPED\t\t" << nUnmapped << "\t(" << unmapPercent << " %)\n";
 	cout << ">>INCORRECTLY_MAPPED\t" << nIncorrectlyMapped << "\t(" << incorrectPercent << " %)\n";
+	cout << ">>INCORRECT_AND_MULTI_MAPPED\t" << nIncorrectAndMulti << "\t(" << incorMultPercent << " %)\n";
 	cout << ">>TOTAL_UNIQUE_IDS\t" << uniqueReadIDs << "\n";
 	cout << "\n";
 
@@ -703,6 +717,7 @@ int main(int argc, char *argv[])
 		outF << ">>MULTI_MAPPED_IDS\t" << multimapped_int << "\n";
 		outF << ">>UNMAPPED\t" << nUnmapped << "\n";
 		outF << ">>INCORRECTLY_MAPPED\t" << nIncorrectlyMapped << "\n";
+		outF << ">>INCORRECT_AND_MULTI_MAPPED\t" << nIncorrectAndMulti << "\n";
 		outF << ">>TOTAL_UNIQUE_IDS\t" << uniqueReadIDs << "\n";
 
 		//	ref-Lengths
