@@ -63,7 +63,6 @@ def main():
 	#	writeInChunks(of,f)
 	#	f.close()
 	#of.close()
-	print 'merging SAM files...'
 	os.system('cat '+' '.join(fq2List)+' > '+dn+'_read2.fq')
 
 	#if len(samList) > 0:
@@ -86,10 +85,12 @@ def main():
 	#if len(samList) > 0:
 	#	of.close()
 	if len(samList) > 0:
-		os.system('grep -E "(@)" '+samList[0]+' > '+dn+'_golden.sam')
-		os.system('grep -vhE "(@|^$)" '+' '.join(samList)+' >> '+dn+'_golden.sam')
+		print 'merging SAM files...'
+		os.system('grep -E "(^@)" '+samList[0]+' > '+dn+'_golden.sam')
+		os.system('grep -vhE "(^@|^$)" '+' '.join(samList)+' >> '+dn+'_golden.sam')
 
-	print 'merging VCF files...'
+	if len(vcfList) > 0:
+		print 'merging VCF files...'
 	variantInf = {}
 	for fn in vcfList:
 		f = open(fn,'r')
