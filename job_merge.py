@@ -65,25 +65,28 @@ def main():
 	#of.close()
 	os.system('cat '+' '.join(fq2List)+' > '+dn+'_read2.fq')
 
+	#if len(samList) > 0:
+	#	of = open(dn+'_golden.sam','wb')
+	#for fn in samList:
+	#	f = open(fn,'r')
+	#	if fn == samList[0]:
+	#		writeInChunks(of,f)
+	#	else:
+	#		fch = ''
+	#		fchPrev = ''
+	#		while True:
+	#			(ft,fch) = (f.tell(),f.read(1))
+	#			if fchPrev == '\n' and fch != '@':
+	#				break
+	#			fchPrev = fch
+	#		f.seek(ft)
+	#		writeInChunks(of,f)
+	#	f.close()
+	#if len(samList) > 0:
+	#	of.close()
 	if len(samList) > 0:
-		of = open(dn+'_golden.sam','wb')
-	for fn in samList:
-		f = open(fn,'r')
-		if fn == samList[0]:
-			writeInChunks(of,f)
-		else:
-			fch = ''
-			fchPrev = ''
-			while True:
-				(ft,fch) = (f.tell(),f.read(1))
-				if fchPrev == '\n' and fch != '@':
-					break
-				fchPrev = fch
-			f.seek(ft)
-			writeInChunks(of,f)
-		f.close()
-	if len(samList) > 0:
-		of.close()
+		os.system('grep -E "(@)" '+samList[0]+' > '+dn+'_golden.sam')
+		os.system('grep -vhE "(@|^$)" '+' '.join(samList)+' >> '+dn+'_golden.sam')
 
 	variantInf = {}
 	for fn in vcfList:
