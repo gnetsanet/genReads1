@@ -47,7 +47,6 @@ def main():
 	vcfList = [n[1] for n in vcfList]
 
 	tt = time.time()
-	print 'merging files...'
 
 	#of = open(dn+'_read1.fq','wb')
 	#for fn in fq1List:
@@ -55,6 +54,7 @@ def main():
 	#	writeInChunks(of,f)
 	#	f.close()
 	#of.close()
+	print 'merging FASTQ files...'
 	os.system('cat '+' '.join(fq1List)+' > '+dn+'_read1.fq')
 
 	#of = open(dn+'_read2.fq','wb')
@@ -63,6 +63,7 @@ def main():
 	#	writeInChunks(of,f)
 	#	f.close()
 	#of.close()
+	print 'merging SAM files...'
 	os.system('cat '+' '.join(fq2List)+' > '+dn+'_read2.fq')
 
 	#if len(samList) > 0:
@@ -88,6 +89,7 @@ def main():
 		os.system('grep -E "(@)" '+samList[0]+' > '+dn+'_golden.sam')
 		os.system('grep -vhE "(@|^$)" '+' '.join(samList)+' >> '+dn+'_golden.sam')
 
+	print 'merging VCF files...'
 	variantInf = {}
 	for fn in vcfList:
 		f = open(fn,'r')
