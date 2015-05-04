@@ -592,11 +592,15 @@ def main():
 		OUTVCF.write('##reference='+REFERENCE+'\n')
 		OUTVCF.write('##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">\n')
 		OUTVCF.write('##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency">\n')
-		OUTVCF.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">\n')
-		OUTVCF.write('##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n')
-		OUTVCF.write('##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">\n')
-		OUTVCF.write('##INFO=<ID=TRANSREF,Number=1,Type=String,Description="Name of reference sequence where inserted bases of translocated sequence originate">\n')
-		OUTVCF.write('##INFO=<ID=TRANSPOS,Number=.,Type=Integer,Description="Position within TRANSREF where the inserted bases of translocated sequence originate">\n')
+		OUTVCF.write('##INFO=<ID=READS,Number=1,Type=String,Description="Names of Reads Covering this Variant">\n')
+		OUTVCF.write('##INFO=<ID=VMX,Number=1,Type=String,Description="SNP is Missense in these Read Frames">\n')
+		OUTVCF.write('##INFO=<ID=VNX,Number=1,Type=String,Description="SNP is Nonsense in these Read Frames">\n')
+		OUTVCF.write('##INFO=<ID=VFX,Number=1,Type=String,Description="Indel Causes Frameshift">\n')
+		#OUTVCF.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">\n')
+		#OUTVCF.write('##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n')
+		#OUTVCF.write('##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="Difference in length between REF and ALT alleles">\n')
+		#OUTVCF.write('##INFO=<ID=TRANSREF,Number=1,Type=String,Description="Name of reference sequence where inserted bases of translocated sequence originate">\n')
+		#OUTVCF.write('##INFO=<ID=TRANSPOS,Number=.,Type=Integer,Description="Position within TRANSREF where the inserted bases of translocated sequence originate">\n')
 		OUTVCF.write('##ALT=<ID=DEL,Description="Deletion">\n')
 		OUTVCF.write('##ALT=<ID=DUP,Description="Duplication">\n')
 		OUTVCF.write('##ALT=<ID=INS,Description="Insertion of novel sequence">\n')
@@ -1103,7 +1107,7 @@ def main():
 		# save new reference to file if desired
 		if SAVE_CORRECT_REF and JOB_ID == 1:
 			colWidth = 50
-			of = open(OUTFILE_NAME+'_'+refName+'_correctRef.fa','wb')
+			of = open(OUTFILE_NAME+'_mutated.fa','ab+')
 			of.write('>'+refName+'\n')
 			for i in xrange(0,myLen,colWidth):
 				of.write(myDat[i:i+colWidth]+'\n')
