@@ -195,6 +195,8 @@ def parseLine(splt,colDict,colSamp):
 		if ':AF:' in format:
 			afInd = splt[colDict['FORMAT']].split(':').index('AF')
 			af    = splt[colSamp[0]].split(':')[afInd]
+
+	print 'RAWR:', af
 	if af != None:
 		af_splt = af.split(',')
 		while(len(af_splt) < len(alt_alleles)):	# are we lacking enough AF values for some reason?
