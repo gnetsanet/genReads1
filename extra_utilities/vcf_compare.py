@@ -186,7 +186,7 @@ def parseLine(splt,colDict,colSamp):
 
 	#	check INFO for AF first
 	af = None
-	if 'INFO' in colDict and 'AF=' in splt[colDict['INFO']]:
+	if 'INFO' in colDict and ';AF=' in ';'+splt[colDict['INFO']]:
 		info = splt[colDict['INFO']]+';'
 		af  = re.findall(r"AF=.*?(?=;)",info)[0][3:]
 	#	check FORMAT/SAMPLE for AF second:
@@ -201,8 +201,6 @@ def parseLine(splt,colDict,colSamp):
 		while(len(af_splt) < len(alt_alleles)):	# are we lacking enough AF values for some reason?
 			af_splt.append(af_splt[-1])			# phone it in.
 		if len(af_splt) != 0 and af_splt[0] != '.' and af_splt[0] != '':		# missing data, yay
-			print splt
-			print af
 			alt_freqs = [float(n) for n in af_splt]
 	else:
 		alt_freqs = [None]*max([len(alt_alleles),1])
