@@ -196,13 +196,13 @@ def parseLine(splt,colDict,colSamp):
 			afInd = splt[colDict['FORMAT']].split(':').index('AF')
 			af    = splt[colSamp[0]].split(':')[afInd]
 
-	print 'RAWR:', af
 	if af != None:
 		af_splt = af.split(',')
 		while(len(af_splt) < len(alt_alleles)):	# are we lacking enough AF values for some reason?
 			af_splt.append(af_splt[-1])			# phone it in.
 		if len(af_splt) != 0 and af_splt[0] != '.' and af_splt[0] != '':		# missing data, yay
 			print splt
+			print af
 			alt_freqs = [float(n) for n in af_splt]
 	else:
 		alt_freqs = [None]*max([len(alt_alleles),1])
