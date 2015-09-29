@@ -1,7 +1,0 @@
-zcat mySortedAlignment.bam | alignAcc
-
-
-optionally you can specify an output txt file that contains various alignment stats:
-
-
-zcat mySortedAlignment.bam | alignAcc -o myOut.txt
